@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trivia Tournament - Multiplayer Ready</title>
+  
+  <!-- React -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Inter:wght@400;500;600&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Inter', sans-serif; 
+      background: linear-gradient(to bottom right, #020617, #3b0764, #020617);
+      color: white;
+      min-height: 100vh;
+    }
+    
+    .container { max-width: 56rem; margin: 0 auto; padding: 2rem; }
+    .container-sm { max-width: 28rem; margin: 0 auto; padding: 2rem; }
+    .container-lg { max-width: 72rem; margin: 0 auto; padding: 2rem; }
+    
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+    }
+    
+    .title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+    }
+    
+    .glow {
+      text-shadow: 0 0 20px rgba(168, 85, 247, 0.5), 0 0 40px rgba(168, 85, 247, 0.3);
+    }
+    
+    button {
+      border: none;
+      cursor: pointer;
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      transition: all 0.3s;
+      font-size: 1rem;
+    }
+    
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(168, 85, 247, 0.4);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-purple {
+      background: linear-gradient(to right, #9333ea, #6b21a8);
+      border: 2px solid rgba(168, 85, 247, 0.5);
+    }
+    
+    .btn-blue {
+      background: linear-gradient(to right, #2563eb, #1e40af);
+      border: 2px solid rgba(59, 130, 246, 0.5);
+    }
+    
+    .btn-green {
+      background: linear-gradient(to right, #16a34a, #065f46);
+      border: 2px solid rgba(34, 197, 94, 0.5);
+    }
+    
+    input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(15, 23, 42, 0.5);
+      border: 2px solid rgba(168, 85, 247, 0.3);
+      border-radius: 0.5rem;
+      color: white;
+      font-size: 1rem;
+      outline: none;
+    }
+    
+    input:focus {
+      border-color: rgba(168, 85, 247, 0.8);
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+    }
+    
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    
+    .text-center { text-align: center; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .mb-8 { margin-bottom: 2rem; }
+    .mb-12 { margin-bottom: 3rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-6 { margin-top: 1.5rem; }
+    
+    .icon-lg { width: 6rem; height: 6rem; margin: 0 auto 1.5rem; }
+    .icon-md { width: 4rem; height: 4rem; margin: 0 auto 1rem; }
+    .icon-sm { width: 1.5rem; height: 1.5rem; display: inline-block; margin-right: 0.5rem; }
+    
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    
+    .slide-up { animation: slideUp 0.5s ease-out; }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes countdown {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+    
+    .countdown-num {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 10rem;
+      z-index: 100;
+      animation: countdown 1s ease-out;
+    }
+    
+    .overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99;
+    }
+    
+    .powerup-icon {
+      font-size: 2rem;
+      padding: 0.5rem;
+      background: rgba(88, 28, 135, 0.3);
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      border-radius: 0.5rem;
+      display: inline-block;
+      margin: 0.25rem;
+    }
+    
+    .player-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    
+    .code-display {
+      background: rgba(88, 28, 135, 0.3);
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      padding: 1rem 2rem;
+      border-radius: 999px;
+      display: inline-block;
+      margin-bottom: 1.5rem;
+    }
+    
+    .error-box, .success-box {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 1rem 1.5rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      z-index: 100;
+      max-width: 28rem;
+      color: white;
+    }
+    
+    .error-box { background: #dc2626; }
+    .success-box { background: #16a34a; }
+    
+    .announcement {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(88, 28, 135, 0.9);
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      padding: 1rem 2rem;
+      border-radius: 0.75rem;
+      z-index: 100;
+      max-width: 56rem;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+    }
+    
+    .status-indicator {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .info-box {
+      background: rgba(59, 130, 246, 0.2);
+      border: 2px solid rgba(59, 130, 246, 0.5);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Icons
+    const TrophyIcon = () => (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{width: '100%', height: '100%'}}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+      </svg>
+    );
+
+    const UsersIcon = () => (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{width: '100%', height: '100%'}}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    );
+
+    const CrownIcon = () => (
+      <svg fill="currentColor" viewBox="0 0 20 20" style={{width: '100%', height: '100%'}}>
+        <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" />
+      </svg>
+    );
+
+    // Simple storage using localStorage
+    const storage = {
+      async get(key) {
+        try {
+          const value = localStorage.getItem(key);
+          return value ? { key, value } : null;
+        } catch (error) {
+          console.error('Storage get error:', error);
+          return null;
+        }
+      },
+      
+      async set(key, value) {
+        try {
+          localStorage.setItem(key, value);
+          return { key, value };
+        } catch (error) {
+          console.error('Storage set error:', error);
+          return null;
+        }
+      }
+    };
+
+    const TriviaApp = () => {
+      const [view, setView] = useState('home');
+      const [hostName, setHostName] = useState('');
+      const [playerName, setPlayerName] = useState('');
+      const [gameCode, setGameCode] = useState('');
+      const [theme, setTheme] = useState('');
+      const [gameMode, setGameMode] = useState('normal');
+      const [currentGame, setCurrentGame] = useState(null);
+      const [error, setError] = useState('');
+      const [success, setSuccess] = useState('');
+      const [countdown, setCountdown] = useState(0);
+      const [announcement, setAnnouncement] = useState('');
+
+      // Poll for game updates
+      useEffect(() => {
+        if (!gameCode) return;
+        
+        const pollGame = async () => {
+          const result = await storage.get(`game:${gameCode}`);
+          if (result) {
+            const game = JSON.parse(result.value);
+            setCurrentGame(game);
+            
+            if (game.announcement && view === 'lobby') {
+              setAnnouncement(game.announcement);
+              setTimeout(() => setAnnouncement(''), 5000);
+            }
+          }
+        };
+        
+        pollGame();
+        const interval = setInterval(pollGame, 2000);
+        
+        return () => clearInterval(interval);
+      }, [gameCode, view]);
+
+      const generateCode = () => {
+        return Math.random().toString(36).substring(2, 8).toUpperCase();
+      };
+
+      const createGame = async () => {
+        console.log('Creating game...');
+        
+        if (!hostName || !theme) {
+          setError('Please fill in all fields');
+          setTimeout(() => setError(''), 3000);
+          return;
+        }
+        
+        setError('');
+        setSuccess('Creating game...');
+        
+        const code = generateCode();
+        const newGame = {
+          code,
+          host: hostName,
+          theme,
+          mode: gameMode,
+          players: [{ name: hostName, id: Date.now(), isHost: true, powerups: [] }],
+          status: 'lobby',
+          bracket: null,
+          currentRound: 0,
+          powerupStates: {},
+          announcement: ''
+        };
+
+        await storage.set(`game:${code}`, JSON.stringify(newGame));
+        setGameCode(code);
+        setPlayerName(hostName);
+        setCurrentGame(newGame);
+        setView('lobby');
+        setSuccess('Game created! Share the code with friends.');
+        setTimeout(() => setSuccess(''), 5000);
+        
+        console.log('Game created successfully with code:', code);
+      };
+
+      const joinGame = async () => {
+        console.log('Joining game...');
+        
+        if (!playerName || !gameCode) {
+          setError('Please fill in all fields');
+          setTimeout(() => setError(''), 3000);
+          return;
+        }
+        
+        setError('');
+        setSuccess('Joining game...');
+        
+        const result = await storage.get(`game:${gameCode}`);
+        if (!result) {
+          setError('Game not found! Check the code.');
+          setTimeout(() => setError(''), 3000);
+          setSuccess('');
+          return;
+        }
+
+        const game = JSON.parse(result.value);
+        
+        if (game.status !== 'lobby') {
+          setError('Game has already started!');
+          setTimeout(() => setError(''), 3000);
+          setSuccess('');
+          return;
+        }
+
+        const playerExists = game.players.find(p => p.name === playerName);
+        if (!playerExists) {
+          game.players.push({ name: playerName, id: Date.now(), isHost: false, powerups: [] });
+          await storage.set(`game:${gameCode}`, JSON.stringify(game));
+        }
+        
+        setCurrentGame(game);
+        setView('lobby');
+        setSuccess('Joined successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+        
+        console.log('Joined game successfully');
+      };
+
+      const startTournament = async () => {
+        if (!currentGame || currentGame.players.length < 2) {
+          setError('Need at least 2 players to start!');
+          setTimeout(() => setError(''), 3000);
+          return;
+        }
+
+        setError('');
+        
+        // Create bracket
+        const shuffled = [...currentGame.players].sort(() => Math.random() - 0.5);
+        const bracket = [];
+        let players = [...shuffled];
+        
+        while (players.length > 1) {
+          const matches = [];
+          for (let i = 0; i < players.length; i += 2) {
+            if (i + 1 < players.length) {
+              matches.push({
+                player1: players[i],
+                player2: players[i + 1],
+                winner: null,
+                answers: {}
+              });
+            } else {
+              matches.push({
+                player1: players[i],
+                player2: null,
+                winner: players[i],
+                answers: {}
+              });
+            }
+          }
+          bracket.push(matches);
+          players = matches.map(m => m.winner).filter(w => w !== null);
+        }
+        
+        currentGame.bracket = bracket;
+        currentGame.status = 'playing';
+        currentGame.currentRound = 0;
+        currentGame.currentMatchIndex = 0;
+        
+        // Announce matchups
+        const matchups = bracket[0].map(m => 
+          `${m.player1.name} vs ${m.player2?.name || 'BYE'}`
+        ).join(' • ');
+        
+        currentGame.announcement = `MATCHUPS: ${matchups}`;
+        await storage.set(`game:${gameCode}`, JSON.stringify(currentGame));
+        
+        // Wait 5 seconds
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Clear announcement
+        currentGame.announcement = '';
+        await storage.set(`game:${gameCode}`, JSON.stringify(currentGame));
+        
+        // Countdown
+        for (let i = 3; i > 0; i--) {
+          setCountdown(i);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        setCountdown(0);
+        
+        setSuccess('🎮 Tournament starting!');
+        setTimeout(() => setSuccess(''), 3000);
+      };
+
+      return (
+        <div>
+          {error && <div className="error-box">{error}</div>}
+          {success && <div className="success-box">{success}</div>}
+
+          {countdown > 0 && (
+            <div className="overlay">
+              <div className="countdown-num title glow" key={countdown}>
+                {countdown}
+              </div>
+            </div>
+          )}
+
+          {announcement && (
+            <div className="announcement">
+              <div style={{fontSize: '0.75rem', color: '#d8b4fe', marginBottom: '0.25rem'}}>ANNOUNCEMENT</div>
+              <div className="title" style={{fontSize: '1.25rem'}}>{announcement}</div>
+            </div>
+          )}
+
+          {view === 'home' && (
+            <div className="container slide-up" style={{paddingTop: '4rem'}}>
+              <div className="text-center mb-12">
+                <div className="icon-lg pulse" style={{color: '#c084fc'}}>
+                  <TrophyIcon />
+                </div>
+                <h1 className="title glow" style={{fontSize: '4.5rem', marginBottom: '1rem'}}>
+                  TRIVIA<br/>TOURNAMENT
+                </h1>
+                <p style={{fontSize: '1.125rem', color: '#d8b4fe'}}>
+                  Battle in bracket-style trivia with epic powerups!
+                </p>
+                <p style={{fontSize: '0.875rem', color: '#9ca3af', marginTop: '1rem'}}>
+                  ✅ Works on any device • No login required!
+                </p>
+              </div>
+              
+              <div className="info-box text-center">
+                <div style={{fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#60a5fa'}}>
+                  📱 MULTIPLAYER READY
+                </div>
+                <p style={{fontSize: '0.75rem', color: '#bfdbfe'}}>
+                  Host the game, share the code, and friends can join from any device!
+                </p>
+              </div>
+              
+              <div className="grid-2">
+                <button className="btn-purple card" onClick={() => setView('create')} style={{padding: '2rem'}}>
+                  <div className="icon-md" style={{color: '#c084fc'}}>
+                    <CrownIcon />
+                  </div>
+                  <div className="title" style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>HOST GAME</div>
+                  <p style={{fontSize: '0.875rem', color: '#e9d5ff'}}>Create a tournament</p>
+                </button>
+                
+                <button className="btn-blue card" onClick={() => setView('join')} style={{padding: '2rem'}}>
+                  <div className="icon-md" style={{color: '#60a5fa'}}>
+                    <UsersIcon />
+                  </div>
+                  <div className="title" style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>JOIN GAME</div>
+                  <p style={{fontSize: '0.875rem', color: '#bfdbfe'}}>Enter game code</p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view === 'create' && (
+            <div className="container-sm slide-up" style={{paddingTop: '4rem'}}>
+              <button onClick={() => setView('home')} className="mb-8" style={{background: 'transparent', color: '#c084fc', padding: '0.5rem 1rem'}}>
+                ← Back
+              </button>
+              
+              <div className="card">
+                <div className="icon-md mb-6" style={{color: '#c084fc'}}>
+                  <CrownIcon />
+                </div>
+                <h2 className="title text-center mb-8" style={{fontSize: '1.875rem'}}>CREATE TOURNAMENT</h2>
+                
+                <div>
+                  <div className="mb-6">
+                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#d8b4fe'}}>
+                      YOUR NAME
+                    </label>
+                    <input
+                      type="text"
+                      value={hostName}
+                      onChange={(e) => setHostName(e.target.value)}
+                      placeholder="Enter your name"
+                    />
+                  </div>
+                  
+                  <div className="mb-6">
+                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#d8b4fe'}}>
+                      TRIVIA THEME
+                    </label>
+                    <input
+                      type="text"
+                      value={theme}
+                      onChange={(e) => setTheme(e.target.value)}
+                      placeholder="e.g., Movies, Science, History"
+                    />
+                  </div>
+                  
+                  <div className="mb-6">
+                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: '#d8b4fe'}}>
+                      GAME MODE
+                    </label>
+                    <div className="grid-2">
+                      <button
+                        type="button"
+                        onClick={() => setGameMode('normal')}
+                        style={{
+                          padding: '1rem',
+                          background: gameMode === 'normal' ? 'rgba(88, 28, 135, 0.3)' : 'rgba(30, 41, 59, 0.3)',
+                          border: gameMode === 'normal' ? '2px solid rgba(168, 85, 247, 0.5)' : '2px solid #334155',
+                          borderRadius: '0.5rem'
+                        }}
+                      >
+                        <div style={{fontWeight: '700', marginBottom: '0.25rem'}}>NORMAL</div>
+                        <div style={{fontSize: '0.75rem', color: '#9ca3af'}}>Classic trivia</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGameMode('special')}
+                        style={{
+                          padding: '1rem',
+                          background: gameMode === 'special' ? 'rgba(88, 28, 135, 0.3)' : 'rgba(30, 41, 59, 0.3)',
+                          border: gameMode === 'special' ? '2px solid rgba(168, 85, 247, 0.5)' : '2px solid #334155',
+                          borderRadius: '0.5rem'
+                        }}
+                      >
+                        <div style={{fontWeight: '700', marginBottom: '0.25rem'}}>SPECIAL</div>
+                        <div style={{fontSize: '0.75rem', color: '#9ca3af'}}>With powerups!</div>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={createGame}
+                    disabled={!hostName || !theme}
+                    className="btn-purple title"
+                    style={{width: '100%', fontSize: '1.25rem'}}
+                  >
+                    CREATE GAME
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {view === 'join' && (
+            <div className="container-sm slide-up" style={{paddingTop: '4rem'}}>
+              <button onClick={() => setView('home')} className="mb-8" style={{background: 'transparent', color: '#c084fc', padding: '0.5rem 1rem'}}>
+                ← Back
+              </button>
+              
+              <div className="card">
+                <div className="icon-md mb-6" style={{color: '#60a5fa'}}>
+                  <UsersIcon />
+                </div>
+                <h2 className="title text-center mb-8" style={{fontSize: '1.875rem'}}>JOIN TOURNAMENT</h2>
+                
+                <div>
+                  <div className="mb-6">
+                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#d8b4fe'}}>
+                      YOUR NAME
+                    </label>
+                    <input
+                      type="text"
+                      value={playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      placeholder="Enter your name"
+                    />
+                  </div>
+                  
+                  <div className="mb-6">
+                    <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#d8b4fe'}}>
+                      GAME CODE
+                    </label>
+                    <input
+                      type="text"
+                      value={gameCode}
+                      onChange={(e) => setGameCode(e.target.value.toUpperCase())}
+                      placeholder="XXXXXX"
+                      maxLength={6}
+                      style={{textAlign: 'center', fontSize: '1.5rem', letterSpacing: '0.1em', textTransform: 'uppercase'}}
+                    />
+                  </div>
+                  
+                  <button
+                    onClick={joinGame}
+                    disabled={!playerName || !gameCode}
+                    className="btn-blue title"
+                    style={{width: '100%', fontSize: '1.25rem'}}
+                  >
+                    JOIN GAME
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {view === 'lobby' && currentGame && (
+            <div className="container-lg slide-up" style={{paddingTop: '2rem'}}>
+              <div className="text-center mb-12">
+                <div className="code-display">
+                  <div style={{fontSize: '0.875rem', color: '#d8b4fe', marginBottom: '0.25rem'}}>GAME CODE</div>
+                  <div className="title" style={{fontSize: '2.25rem', letterSpacing: '0.1em'}}>{currentGame.code}</div>
+                </div>
+                
+                <h2 className="title mb-2" style={{fontSize: '1.875rem'}}>WAITING FOR PLAYERS</h2>
+                <p style={{color: '#d8b4fe'}}>
+                  Theme: <span style={{fontWeight: '600', color: 'white'}}>{currentGame.theme}</span>
+                </p>
+                <p style={{fontSize: '0.875rem', color: '#c084fc', marginTop: '0.5rem'}}>
+                  Mode: <span style={{fontWeight: '600', color: 'white'}}>
+                    {currentGame.mode === 'special' ? '⚡ SPECIAL (Powerups!)' : 'NORMAL'}
+                  </span>
+                </p>
+                
+                {currentGame.mode === 'special' && (
+                  <div className="mt-6" style={{display: 'inline-block', background: 'rgba(124, 45, 18, 0.3)', padding: '1rem', borderRadius: '0.5rem', border: '2px solid rgba(168, 85, 247, 0.5)'}}>
+                    <div style={{fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem'}}>AVAILABLE POWERUPS:</div>
+                    <div style={{fontSize: '1.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap'}}>
+                      <span title="Ice Freeze" className="powerup-icon"❄️</span>
+                      <span title="Fireball" className="powerup-icon">🔥</span>
+                      <span title="Double Trouble" className="powerup-icon">✌️</span>
+                      <span title="Shield" className="powerup-icon">🛡️</span>
+                      <span title="Switch" className="powerup-icon">🔄</span>
+                      <span title="Battlestar" className="powerup-icon">⭐</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid-3 mb-12">
+                {currentGame.players.map((player) => (
+                  <div key={player.id} className="player-card">
+                    {player.isHost && (
+                      <div className="icon-sm" style={{color: '#fbbf24', margin: '0 auto 0.5rem'}}>
+                        <CrownIcon />
+                      </div>
+                    )}
+                    <div style={{fontWeight: '600', fontSize: '1.125rem'}}>{player.name}</div>
+                    {player.isHost && <div style={{fontSize: '0.75rem', color: '#c084fc', marginTop: '0.25rem'}}>HOST</div>}
+                  </div>
+                ))}
+              </div>
+              
+              {currentGame.host === playerName && (
+                <div style={{textAlign: 'center'}}>
+                  <button
+                    onClick={startTournament}
+                    disabled={currentGame.players.length < 2}
+                    className="btn-green title"
+                    style={{fontSize: '1.5rem', padding: '1rem 3rem'}}
+                  >
+                    ⚡ START TOURNAMENT
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="status-indicator">
+            <div style={{color: '#4ade80'}}>✅ Ready to play!</div>
+            <div style={{color: '#9ca3af'}}>Open in multiple tabs to test</div>
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<TriviaApp />);
+  </script>
+</body>
+</html>
