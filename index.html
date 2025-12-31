@@ -110,6 +110,20 @@
       };
     }
 
+    // Poll for updates to keep all tabs in sync
+    setInterval(() => {
+      if (state.currentGame && state.gameCode) {
+        const game = games[state.gameCode];
+        if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
+          state.currentGame = game;
+          if (game.announcement) {
+            state.announcement = game.announcement;
+          }
+          render();
+        }
+      }
+    }, 500);
+
     function createGame() {
       if (!state.hostName || !state.theme) {
         showError('Please fill in all fields');
@@ -146,7 +160,7 @@
       const game = games[state.gameCode];
       
       if (!game) {
-        showError('Game not found! Make sure host created it first.');
+        showError('Game not found! Make sure the host created the game in another tab first.');
         return;
       }
 
@@ -158,10 +172,12 @@
       const exists = game.players.find(p => p.name === state.playerName);
       if (!exists) {
         game.players.push({ name: state.playerName, id: Date.now(), isHost: false });
+        games[state.gameCode] = game;
         broadcast({ type: 'game_update', code: state.gameCode, game });
       }
 
       state.currentGame = game;
+      state.gameCode = state.gameCode;
       state.view = 'lobby';
       showSuccess('Joined successfully!');
     }
