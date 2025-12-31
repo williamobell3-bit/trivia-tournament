@@ -59,7 +59,26 @@
   <script>
     // Use BroadcastChannel for same-device multiplayer (works in multiple tabs)
     const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('trivia_sync') : null;
-    const games = {};
+    
+    // Load games from localStorage on startup
+    const loadGames = () => {
+      try {
+        const stored = localStorage.getItem('trivia_games');
+        return stored ? JSON.parse(stored) : {};
+      } catch {
+        return {};
+      }
+    };
+    
+    const saveGames = (gamesObj) => {
+      try {
+        localStorage.setItem('trivia_games', JSON.stringify(gamesObj));
+      } catch (e) {
+        console.error('Could not save to localStorage');
+      }
+    };
+    
+    const games = loadGames();
     
     let state = {
       view: 'home',
@@ -98,7 +117,10 @@
     if (bc) {
       bc.onmessage = (event) => {
         if (event.data.type === 'game_update') {
+          // Store the game in this tab's games object
           games[event.data.code] = event.data.game;
+          saveGames(games);
+          
           if (state.gameCode === event.data.code) {
             state.currentGame = event.data.game;
             if (event.data.game.announcement) {
@@ -113,8 +135,10 @@
     // Poll for updates to keep all tabs in sync
     setInterval(() => {
       if (state.currentGame && state.gameCode) {
-        const game = games[state.gameCode];
+        const currentGames = loadGames();
+        const game = currentGames[state.gameCode];
         if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
+          Object.assign(games, currentGames);
           state.currentGame = game;
           if (game.announcement) {
             state.announcement = game.announcement;
@@ -142,6 +166,7 @@
       };
 
       games[code] = newGame;
+      saveGames(games);
       broadcast({ type: 'game_update', code, game: newGame });
       
       state.gameCode = code;
@@ -157,7 +182,9 @@
         return;
       }
 
-      const game = games[state.gameCode];
+      // Reload games from localStorage to get the latest
+      const currentGames = loadGames();
+      const game = currentGames[state.gameCode];
       
       if (!game) {
         showError('Game not found! Make sure the host created the game in another tab first.');
@@ -172,10 +199,14 @@
       const exists = game.players.find(p => p.name === state.playerName);
       if (!exists) {
         game.players.push({ name: state.playerName, id: Date.now(), isHost: false });
-        games[state.gameCode] = game;
+        currentGames[state.gameCode] = game;
+        saveGames(currentGames);
         broadcast({ type: 'game_update', code: state.gameCode, game });
       }
 
+      // Update local games object
+      Object.assign(games, currentGames);
+      
       state.currentGame = game;
       state.gameCode = state.gameCode;
       state.view = 'lobby';
@@ -196,6 +227,8 @@
 
       state.currentGame.announcement = `MATCHUPS: ${matchups}`;
       state.currentGame.status = 'playing';
+      games[state.gameCode] = state.currentGame;
+      saveGames(games);
       broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
       
       state.announcement = state.currentGame.announcement;
@@ -205,6 +238,8 @@
       
       state.announcement = '';
       state.currentGame.announcement = '';
+      games[state.gameCode] = state.currentGame;
+      saveGames(games);
       broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
       render();
       
