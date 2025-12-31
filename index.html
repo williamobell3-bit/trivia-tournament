@@ -91,8 +91,51 @@
       error: '',
       success: '',
       countdown: 0,
-      announcement: ''
+      announcement: '',
+      currentQuestion: null,
+      selectedAnswer: null,
+      hasAnswered: false,
+      timeLeft: 0
     };
+
+    // Trivia questions database
+    const triviaQuestions = {
+      'Logic': [
+        { question: "If all roses are flowers and some flowers fade quickly, can we conclude that some roses fade quickly?", options: ["Yes", "No", "Cannot be determined", "Only in summer"], correct: 2 },
+        { question: "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?", options: ["$0.10", "$0.05", "$0.15", "$0.20"], correct: 1 },
+        { question: "What comes next in the sequence: 2, 6, 12, 20, 30, ?", options: ["36", "40", "42", "38"], correct: 2 },
+        { question: "If you're running a race and you pass the person in 2nd place, what place are you in?", options: ["1st place", "2nd place", "3rd place", "Depends on total runners"], correct: 1 },
+        { question: "Which is heavier: a pound of feathers or a pound of gold?", options: ["Feathers", "Gold", "They weigh the same", "Gold is heavier"], correct: 2 },
+        { question: "What is the missing number: 1, 1, 2, 3, 5, 8, ?, 21", options: ["11", "13", "15", "17"], correct: 1 },
+        { question: "If it takes 5 machines 5 minutes to make 5 widgets, how long would it take 100 machines to make 100 widgets?", options: ["100 minutes", "20 minutes", "5 minutes", "1 minute"], correct: 2 },
+        { question: "A doctor gives you 3 pills and tells you to take one every half hour. How long will the pills last?", options: ["1.5 hours", "1 hour", "30 minutes", "2 hours"], correct: 1 }
+      ],
+      'Science': [
+        { question: "What is the chemical symbol for gold?", options: ["Go", "Gd", "Au", "Ag"], correct: 2 },
+        { question: "How many planets are in our solar system?", options: ["7", "8", "9", "10"], correct: 1 },
+        { question: "What is the speed of light?", options: ["300,000 km/s", "150,000 km/s", "450,000 km/s", "200,000 km/s"], correct: 0 },
+        { question: "What is the largest organ in the human body?", options: ["Heart", "Brain", "Liver", "Skin"], correct: 3 },
+        { question: "What gas do plants absorb from the atmosphere?", options: ["Oxygen", "Nitrogen", "Carbon Dioxide", "Hydrogen"], correct: 2 },
+        { question: "What is H2O commonly known as?", options: ["Hydrogen Peroxide", "Water", "Acid", "Salt"], correct: 1 },
+        { question: "How many bones are in the adult human body?", options: ["186", "206", "226", "246"], correct: 1 },
+        { question: "What planet is known as the Red Planet?", options: ["Venus", "Jupiter", "Mars", "Saturn"], correct: 2 }
+      ],
+      'History': [
+        { question: "In what year did World War II end?", options: ["1943", "1944", "1945", "1946"], correct: 2 },
+        { question: "Who was the first President of the United States?", options: ["Thomas Jefferson", "George Washington", "John Adams", "Benjamin Franklin"], correct: 1 },
+        { question: "Which ancient wonder is still standing?", options: ["Colossus of Rhodes", "Great Pyramid of Giza", "Hanging Gardens", "Lighthouse of Alexandria"], correct: 1 },
+        { question: "What year did the Berlin Wall fall?", options: ["1987", "1988", "1989", "1990"], correct: 2 },
+        { question: "Who was the first person to walk on the moon?", options: ["Buzz Aldrin", "Neil Armstrong", "Yuri Gagarin", "Michael Collins"], correct: 1 },
+        { question: "In which year did Columbus reach the Americas?", options: ["1490", "1492", "1494", "1496"], correct: 1 },
+        { question: "Who painted the Mona Lisa?", options: ["Michelangelo", "Raphael", "Leonardo da Vinci", "Donatello"], correct: 2 },
+        { question: "What was the name of the ship that brought the Pilgrims to America?", options: ["Mayflower", "Santa Maria", "Discovery", "Endeavour"], correct: 0 }
+      ]
+    };
+
+    function getRandomQuestion(theme) {
+      const questions = triviaQuestions[theme] || triviaQuestions['Logic'];
+      return questions[Math.floor(Math.random() * questions.length)];
+    }
 
     function generateCode() {
       return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -123,6 +166,16 @@
           
           if (state.gameCode === event.data.code) {
             state.currentGame = event.data.game;
+            
+            // Sync question across all players
+            if (event.data.game.currentQuestion && !state.currentQuestion) {
+              state.currentQuestion = event.data.game.currentQuestion;
+              state.view = 'playing';
+              state.hasAnswered = false;
+              state.selectedAnswer = null;
+              state.timeLeft = 15;
+            }
+            
             if (event.data.game.announcement) {
               state.announcement = event.data.game.announcement;
             }
@@ -250,8 +303,78 @@
       }
       
       state.countdown = 0;
-      showSuccess('Tournament starting!');
+      
+      // Start the first question
+      startQuestion();
+    }
+
+    function startQuestion() {
+      state.view = 'playing';
+      state.hasAnswered = false;
+      state.selectedAnswer = null;
+      state.timeLeft = 15;
+      
+      const question = getRandomQuestion(state.currentGame.theme);
+      state.currentQuestion = question;
+      
+      state.currentGame.currentQuestion = question;
+      games[state.gameCode] = state.currentGame;
+      saveGames(games);
+      broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
+      
       render();
+      
+      // Start timer
+      const timer = setInterval(() => {
+        state.timeLeft--;
+        render();
+        
+        if (state.timeLeft <= 0) {
+          clearInterval(timer);
+          if (!state.hasAnswered) {
+            showError('Time\'s up!');
+            setTimeout(() => {
+              showResults();
+            }, 2000);
+          }
+        }
+      }, 1000);
+    }
+
+    function answerQuestion(answerIndex) {
+      if (state.hasAnswered) return;
+      
+      state.hasAnswered = true;
+      state.selectedAnswer = answerIndex;
+      
+      const isCorrect = answerIndex === state.currentQuestion.correct;
+      
+      if (isCorrect) {
+        showSuccess('Correct! ✅');
+      } else {
+        showError('Wrong! ❌');
+      }
+      
+      render();
+      
+      setTimeout(() => {
+        showResults();
+      }, 2000);
+    }
+
+    function showResults() {
+      state.view = 'results';
+      render();
+      
+      setTimeout(() => {
+        // For now, just go back to lobby
+        state.view = 'lobby';
+        state.currentGame.status = 'lobby';
+        games[state.gameCode] = state.currentGame;
+        saveGames(games);
+        broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
+        render();
+      }, 3000);
     }
 
     const icons = {
@@ -309,7 +432,7 @@
               </div>
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#d8b4fe">TRIVIA THEME</label>
-                <input type="text" placeholder="e.g., Movies, Science, History" value="${state.theme}" oninput="state.theme=this.value">
+                <input type="text" placeholder="e.g., Logic, Science, History" value="${state.theme}" oninput="state.theme=this.value">
               </div>
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.75rem;color:#d8b4fe">GAME MODE</label>
@@ -389,6 +512,71 @@
               </button>
             </div>
             `:''}
+          </div>
+        `;
+      } else if (state.view === 'playing' && state.currentQuestion) {
+        html += `
+          <div class="container slide-up" style="padding-top:2rem">
+            <div class="card" style="margin-bottom:2rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem">
+                <div style="font-size:0.875rem;color:#d8b4fe">
+                  <span style="font-weight:600">Theme:</span> ${state.currentGame.theme}
+                </div>
+                <div style="font-size:2rem;font-weight:900;color:${state.timeLeft <= 5 ? '#ef4444' : '#10b981'}">
+                  ${state.timeLeft}s
+                </div>
+              </div>
+              
+              <h2 class="title text-center mb-12" style="font-size:1.875rem;line-height:1.4">
+                ${state.currentQuestion.question}
+              </h2>
+              
+              <div class="grid-2" style="gap:1rem">
+                ${state.currentQuestion.options.map((option, i) => {
+                  let bgColor = 'rgba(30,41,59,0.3)';
+                  let borderColor = '#334155';
+                  
+                  if (state.hasAnswered) {
+                    if (i === state.currentQuestion.correct) {
+                      bgColor = 'rgba(34,197,94,0.3)';
+                      borderColor = '#22c55e';
+                    } else if (i === state.selectedAnswer && i !== state.currentQuestion.correct) {
+                      bgColor = 'rgba(239,68,68,0.3)';
+                      borderColor = '#ef4444';
+                    }
+                  } else if (state.selectedAnswer === i) {
+                    bgColor = 'rgba(88,28,135,0.3)';
+                    borderColor = 'rgba(168,85,247,0.5)';
+                  }
+                  
+                  return `
+                    <button 
+                      onclick="answerQuestion(${i})" 
+                      ${state.hasAnswered ? 'disabled' : ''}
+                      style="padding:1.5rem;background:${bgColor};border:2px solid ${borderColor};border-radius:0.75rem;font-size:1.125rem;font-weight:600;min-height:5rem;display:flex;align-items:center;justify-content:center;text-align:center"
+                    >
+                      ${option}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (state.view === 'results') {
+        const wasCorrect = state.selectedAnswer === state.currentQuestion.correct;
+        html += `
+          <div class="container text-center slide-up" style="padding-top:8rem">
+            <div style="font-size:8rem;margin-bottom:2rem">
+              ${wasCorrect ? '✅' : '❌'}
+            </div>
+            <h2 class="title" style="font-size:3rem;margin-bottom:1rem">
+              ${wasCorrect ? 'CORRECT!' : 'WRONG!'}
+            </h2>
+            <p style="font-size:1.25rem;color:#d8b4fe;margin-bottom:1rem">
+              The answer was: <span style="font-weight:700;color:#22c55e">${state.currentQuestion.options[state.currentQuestion.correct]}</span>
+            </p>
+            <p style="font-size:0.875rem;color:#9ca3af">Returning to lobby...</p>
           </div>
         `;
       }
