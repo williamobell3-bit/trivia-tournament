@@ -324,7 +324,7 @@
                   </button>
                 </div>
               </div>
-              <button onclick="createGame()" ${!state.hostName||!state.theme?'disabled':''} class="btn-purple title" style="width:100%;font-size:1.25rem">CREATE GAME</button>
+              <button onclick="createGame()" class="btn-purple title" style="width:100%;font-size:1.25rem">CREATE GAME</button>
             </div>
           </div>
         `;
@@ -343,7 +343,7 @@
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#d8b4fe">GAME CODE</label>
                 <input type="text" placeholder="XXXXXX" maxlength="6" value="${state.gameCode}" oninput="state.gameCode=this.value.toUpperCase()" style="text-align:center;font-size:1.5rem;letter-spacing:0.1em;text-transform:uppercase">
               </div>
-              <button onclick="joinGame()" ${!state.playerName||!state.gameCode?'disabled':''} class="btn-blue title" style="width:100%;font-size:1.25rem">JOIN GAME</button>
+              <button onclick="joinGame()" class="btn-blue title" style="width:100%;font-size:1.25rem">JOIN GAME</button>
             </div>
           </div>
         `;
