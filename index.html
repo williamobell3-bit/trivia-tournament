@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trivia Tournament</title>
+  <title>Trivia Tournament - Online</title>
   
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Inter:wght@400;500;600&display=swap');
@@ -57,28 +57,24 @@
   <div id="app"></div>
 
   <script>
-    // Use BroadcastChannel for same-device multiplayer (works in multiple tabs)
-    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('trivia_sync') : null;
+    // Simple peer-to-peer cloud sync using Gun.js
+    const WS_SERVER = 'wss://gun-manhattan.herokuapp.com/gun';
     
-    // Load games from localStorage on startup
-    const loadGames = () => {
-      try {
-        const stored = localStorage.getItem('trivia_games');
-        return stored ? JSON.parse(stored) : {};
-      } catch {
-        return {};
-      }
-    };
+    let gun;
+    let gameRef;
     
-    const saveGames = (gamesObj) => {
-      try {
-        localStorage.setItem('trivia_games', JSON.stringify(gamesObj));
-      } catch (e) {
-        console.error('Could not save to localStorage');
-      }
-    };
-    
-    const games = loadGames();
+    // Initialize Gun.js
+    function initGun() {
+      return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/gun/gun.js';
+        script.onload = () => {
+          gun = Gun([WS_SERVER]);
+          resolve();
+        };
+        document.head.appendChild(script);
+      });
+    }
     
     let state = {
       view: 'home',
@@ -155,62 +151,46 @@
       setTimeout(() => { state.success = ''; render(); }, 3000);
     }
 
-    function broadcast(data) {
-      if (bc) bc.postMessage(data);
-    }
-
-    if (bc) {
-      bc.onmessage = (event) => {
-        if (event.data.type === 'game_update') {
-          // Store the game in this tab's games object
-          games[event.data.code] = event.data.game;
-          saveGames(games);
-          
-          if (state.gameCode === event.data.code) {
-            state.currentGame = event.data.game;
-            
-            // Sync question across all players
-            if (event.data.game.currentQuestion && !state.currentQuestion) {
-              state.currentQuestion = event.data.game.currentQuestion;
-              state.view = 'playing';
-              state.hasAnswered = false;
-              state.selectedAnswer = null;
-              state.timeLeft = 15;
-            }
-            
-            if (event.data.game.announcement) {
-              state.announcement = event.data.game.announcement;
-            }
-            render();
-          }
-        }
-      };
-    }
-
-    // Poll for updates to keep all tabs in sync
-    setInterval(() => {
-      if (state.currentGame && state.gameCode) {
-        try {
-          const currentGames = loadGames();
-          const game = currentGames[state.gameCode];
-          if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
-            Object.assign(games, currentGames);
-            state.currentGame = game;
-            if (game.announcement) {
-              state.announcement = game.announcement;
-            }
-            render();
-          }
-        } catch (e) {
-          // Ignore errors in polling
-        }
+    // Save game to cloud
+    function saveGame(game) {
+      if (gameRef) {
+        gameRef.put(game);
       }
-    }, 500);
+    }
 
-    function createGame() {
+    // Listen for game updates
+    function listenToGame(code) {
+      gameRef = gun.get('trivia-game-' + code);
+      gameRef.on((data) => {
+        if (data && data.code === code) {
+          state.currentGame = data;
+          
+          // Sync question across all players
+          if (data.currentQuestion && !state.currentQuestion) {
+            state.currentQuestion = data.currentQuestion;
+            state.view = 'playing';
+            state.hasAnswered = false;
+            state.selectedAnswer = null;
+            state.timeLeft = 15;
+          }
+          
+          if (data.announcement) {
+            state.announcement = data.announcement;
+          }
+          
+          render();
+        }
+      });
+    }
+
+    async function createGame() {
       if (!state.hostName || !state.theme) {
         showError('Please fill in all fields');
         return;
+      }
+
+      if (!gun) {
+        await initGun();
       }
 
       const code = generateCode();
@@ -221,55 +201,57 @@
         mode: state.gameMode,
         players: [{ name: state.hostName, id: Date.now(), isHost: true }],
         status: 'lobby',
-        announcement: ''
+        announcement: '',
+        timestamp: Date.now()
       };
 
-      games[code] = newGame;
-      saveGames(games);
-      broadcast({ type: 'game_update', code, game: newGame });
-      
       state.gameCode = code;
       state.playerName = state.hostName;
       state.currentGame = newGame;
+      
+      listenToGame(code);
+      saveGame(newGame);
+      
       state.view = 'lobby';
-      showSuccess('Game created! Code: ' + code);
+      showSuccess('Game created! Share code: ' + code);
     }
 
-    function joinGame() {
+    async function joinGame() {
       if (!state.playerName || !state.gameCode) {
         showError('Please fill in all fields');
         return;
       }
 
-      // Reload games from localStorage to get the latest
-      const currentGames = loadGames();
-      const game = currentGames[state.gameCode];
+      if (!gun) {
+        await initGun();
+      }
+
+      // Listen to the game
+      gameRef = gun.get('trivia-game-' + state.gameCode);
       
-      if (!game) {
-        showError('Game not found! Make sure the host created the game in another tab first.');
-        return;
-      }
+      gameRef.once((data) => {
+        if (!data || !data.code) {
+          showError('Game not found! Check the code.');
+          return;
+        }
 
-      if (game.status !== 'lobby') {
-        showError('Game already started!');
-        return;
-      }
+        if (data.status !== 'lobby') {
+          showError('Game already started!');
+          return;
+        }
 
-      const exists = game.players.find(p => p.name === state.playerName);
-      if (!exists) {
-        game.players.push({ name: state.playerName, id: Date.now(), isHost: false });
-        currentGames[state.gameCode] = game;
-        saveGames(currentGames);
-        broadcast({ type: 'game_update', code: state.gameCode, game });
-      }
+        const exists = data.players.find(p => p.name === state.playerName);
+        if (!exists) {
+          data.players.push({ name: state.playerName, id: Date.now(), isHost: false });
+          data.timestamp = Date.now();
+          saveGame(data);
+        }
 
-      // Update local games object
-      Object.assign(games, currentGames);
-      
-      state.currentGame = game;
-      state.gameCode = state.gameCode;
-      state.view = 'lobby';
-      showSuccess('Joined successfully!');
+        state.currentGame = data;
+        state.view = 'lobby';
+        listenToGame(state.gameCode);
+        showSuccess('Joined successfully!');
+      });
     }
 
     async function startTournament() {
@@ -286,9 +268,8 @@
 
       state.currentGame.announcement = `MATCHUPS: ${matchups}`;
       state.currentGame.status = 'playing';
-      games[state.gameCode] = state.currentGame;
-      saveGames(games);
-      broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
+      state.currentGame.timestamp = Date.now();
+      saveGame(state.currentGame);
       
       state.announcement = state.currentGame.announcement;
       render();
@@ -297,9 +278,8 @@
       
       state.announcement = '';
       state.currentGame.announcement = '';
-      games[state.gameCode] = state.currentGame;
-      saveGames(games);
-      broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
+      state.currentGame.timestamp = Date.now();
+      saveGame(state.currentGame);
       render();
       
       for (let i = 3; i > 0; i--) {
@@ -314,7 +294,7 @@
       startQuestion();
     }
 
-    function startQuestion() {
+    async function startQuestion() {
       // Clear any existing timer
       if (questionTimer) {
         clearInterval(questionTimer);
@@ -330,9 +310,8 @@
       state.currentQuestion = question;
       
       state.currentGame.currentQuestion = question;
-      games[state.gameCode] = state.currentGame;
-      saveGames(games);
-      broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
+      state.currentGame.timestamp = Date.now();
+      saveGame(state.currentGame);
       
       render();
       
@@ -381,7 +360,7 @@
       }, 2000);
     }
 
-    function showResults() {
+    async function showResults() {
       // Make sure timer is cleared
       if (questionTimer) {
         clearInterval(questionTimer);
@@ -391,7 +370,7 @@
       state.view = 'results';
       render();
       
-      setTimeout(() => {
+      setTimeout(async () => {
         // Reset question state
         state.currentQuestion = null;
         state.selectedAnswer = null;
@@ -402,9 +381,8 @@
         state.view = 'lobby';
         state.currentGame.status = 'lobby';
         state.currentGame.currentQuestion = null;
-        games[state.gameCode] = state.currentGame;
-        saveGames(games);
-        broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
+        state.currentGame.timestamp = Date.now();
+        saveGame(state.currentGame);
         render();
       }, 3000);
     }
@@ -418,10 +396,7 @@
     function render() {
       try {
         const app = document.getElementById('app');
-        if (!app) {
-          console.error('App element not found');
-          return;
-        }
+        if (!app) return;
         
         let html = '';
 
@@ -437,11 +412,11 @@
               <div class="icon-lg pulse">${icons.trophy}</div>
               <h1 class="title glow" style="font-size:4.5rem;margin-bottom:1rem">TRIVIA<br/>TOURNAMENT</h1>
               <p style="font-size:1.125rem;color:#d8b4fe">Battle in bracket-style trivia with epic powerups!</p>
-              <p style="font-size:0.875rem;color:#9ca3af;margin-top:1rem">✅ Works instantly • Test in multiple tabs!</p>
+              <p style="font-size:0.875rem;color:#9ca3af;margin-top:1rem">🌍 Play with ANYONE on ANY device!</p>
             </div>
             <div class="info-box text-center">
-              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">📱 MULTIPLAYER MODE</div>
-              <p style="font-size:0.75rem;color:#bfdbfe">Open in multiple browser tabs to play together!</p>
+              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">🚀 REAL ONLINE MULTIPLAYER</div>
+              <p style="font-size:0.75rem;color:#bfdbfe">Zero setup! Works across phones, tablets, and computers!</p>
             </div>
             <div class="grid-2">
               <button class="btn-purple card" onclick="state.view='create';render()" style="padding:2rem">
@@ -621,21 +596,14 @@
 
       html += `
         <div class="status-indicator" onclick="this.style.display='none'" title="Click to dismiss">
-          <div style="color:#4ade80">✅ Ready to play!</div>
-          <div style="color:#9ca3af">Open multiple tabs • Click to hide</div>
+          <div style="color:#4ade80">✅ Online & Ready!</div>
+          <div style="color:#9ca3af">Cross-device enabled • Click to hide</div>
         </div>
       `;
 
       app.innerHTML = html;
       } catch (error) {
         console.error('Render error:', error);
-        document.getElementById('app').innerHTML = `
-          <div style="padding:2rem;text-align:center;color:white">
-            <h1>Error Loading Game</h1>
-            <p style="margin-top:1rem">Please refresh the page</p>
-            <p style="margin-top:0.5rem;font-size:0.875rem;color:#9ca3af">${error.message}</p>
-          </div>
-        `;
       }
     }
 
