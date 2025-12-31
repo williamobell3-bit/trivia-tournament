@@ -190,15 +190,19 @@
     // Poll for updates to keep all tabs in sync
     setInterval(() => {
       if (state.currentGame && state.gameCode) {
-        const currentGames = loadGames();
-        const game = currentGames[state.gameCode];
-        if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
-          Object.assign(games, currentGames);
-          state.currentGame = game;
-          if (game.announcement) {
-            state.announcement = game.announcement;
+        try {
+          const currentGames = loadGames();
+          const game = currentGames[state.gameCode];
+          if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
+            Object.assign(games, currentGames);
+            state.currentGame = game;
+            if (game.announcement) {
+              state.announcement = game.announcement;
+            }
+            render();
           }
-          render();
+        } catch (e) {
+          // Ignore errors in polling
         }
       }
     }, 500);
@@ -412,15 +416,21 @@
     };
 
     function render() {
-      const app = document.getElementById('app');
-      let html = '';
+      try {
+        const app = document.getElementById('app');
+        if (!app) {
+          console.error('App element not found');
+          return;
+        }
+        
+        let html = '';
 
-      if (state.error) html += `<div class="error-box">${state.error}</div>`;
-      if (state.success) html += `<div class="success-box">${state.success}</div>`;
-      if (state.countdown > 0) html += `<div class="overlay"><div class="countdown-num title glow">${state.countdown}</div></div>`;
-      if (state.announcement) html += `<div class="announcement"><div style="font-size:0.75rem;color:#d8b4fe;margin-bottom:0.25rem">ANNOUNCEMENT</div><div class="title" style="font-size:1.25rem">${state.announcement}</div></div>`;
+        if (state.error) html += `<div class="error-box">${state.error}</div>`;
+        if (state.success) html += `<div class="success-box">${state.success}</div>`;
+        if (state.countdown > 0) html += `<div class="overlay"><div class="countdown-num title glow">${state.countdown}</div></div>`;
+        if (state.announcement) html += `<div class="announcement"><div style="font-size:0.75rem;color:#d8b4fe;margin-bottom:0.25rem">ANNOUNCEMENT</div><div class="title" style="font-size:1.25rem">${state.announcement}</div></div>`;
 
-      if (state.view === 'home') {
+        if (state.view === 'home') {
         html += `
           <div class="container slide-up" style="padding-top:4rem">
             <div class="text-center mb-12">
@@ -617,6 +627,16 @@
       `;
 
       app.innerHTML = html;
+      } catch (error) {
+        console.error('Render error:', error);
+        document.getElementById('app').innerHTML = `
+          <div style="padding:2rem;text-align:center;color:white">
+            <h1>Error Loading Game</h1>
+            <p style="margin-top:1rem">Please refresh the page</p>
+            <p style="margin-top:0.5rem;font-size:0.875rem;color:#9ca3af">${error.message}</p>
+          </div>
+        `;
+      }
     }
 
     render();
