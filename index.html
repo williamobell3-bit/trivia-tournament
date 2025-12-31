@@ -3,313 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trivia Tournament - Multiplayer</title>
+  <title>Trivia Tournament</title>
   
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Inter:wght@400;500;600&display=swap');
-    
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    body { 
-      font-family: 'Inter', sans-serif; 
-      background: linear-gradient(to bottom right, #020617, #3b0764, #020617);
-      color: white;
-      min-height: 100vh;
-    }
-    
+    body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom right, #020617, #3b0764, #020617); color: white; min-height: 100vh; }
     .container { max-width: 56rem; margin: 0 auto; padding: 2rem; }
     .container-sm { max-width: 28rem; margin: 0 auto; padding: 2rem; }
     .container-lg { max-width: 72rem; margin: 0 auto; padding: 2rem; }
-    
-    .card {
-      background: rgba(15, 23, 42, 0.5);
-      border: 2px solid rgba(168, 85, 247, 0.5);
-      border-radius: 1rem;
-      padding: 2rem;
-      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
-    }
-    
-    .title {
-      font-family: 'Montserrat', sans-serif;
-      font-weight: 900;
-      letter-spacing: -0.05em;
-    }
-    
-    .glow {
-      text-shadow: 0 0 20px rgba(168, 85, 247, 0.5), 0 0 40px rgba(168, 85, 247, 0.3);
-    }
-    
-    button {
-      border: none;
-      cursor: pointer;
-      color: white;
-      padding: 1rem 2rem;
-      border-radius: 0.5rem;
-      font-weight: 600;
-      transition: all 0.3s;
-      font-size: 1rem;
-      font-family: inherit;
-    }
-    
-    button:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 40px rgba(168, 85, 247, 0.4);
-    }
-    
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    
-    .btn-purple {
-      background: linear-gradient(to right, #9333ea, #6b21a8);
-      border: 2px solid rgba(168, 85, 247, 0.5);
-    }
-    
-    .btn-blue {
-      background: linear-gradient(to right, #2563eb, #1e40af);
-      border: 2px solid rgba(59, 130, 246, 0.5);
-    }
-    
-    .btn-green {
-      background: linear-gradient(to right, #16a34a, #065f46);
-      border: 2px solid rgba(34, 197, 94, 0.5);
-    }
-    
-    input {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: rgba(15, 23, 42, 0.5);
-      border: 2px solid rgba(168, 85, 247, 0.3);
-      border-radius: 0.5rem;
-      color: white;
-      font-size: 1rem;
-      outline: none;
-      font-family: inherit;
-    }
-    
-    input::placeholder {
-      color: rgba(255, 255, 255, 0.5);
-    }
-    
-    input:focus {
-      border-color: rgba(168, 85, 247, 0.8);
-      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
-    }
-    
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.5rem;
-    }
-    
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-    }
-    
+    .card { background: rgba(15, 23, 42, 0.5); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 1rem; padding: 2rem; box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+    .title { font-family: 'Montserrat', sans-serif; font-weight: 900; letter-spacing: -0.05em; }
+    .glow { text-shadow: 0 0 20px rgba(168, 85, 247, 0.5), 0 0 40px rgba(168, 85, 247, 0.3); }
+    button { border: none; cursor: pointer; color: white; padding: 1rem 2rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.3s; font-size: 1rem; font-family: inherit; }
+    button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(168, 85, 247, 0.4); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-purple { background: linear-gradient(to right, #9333ea, #6b21a8); border: 2px solid rgba(168, 85, 247, 0.5); }
+    .btn-blue { background: linear-gradient(to right, #2563eb, #1e40af); border: 2px solid rgba(59, 130, 246, 0.5); }
+    .btn-green { background: linear-gradient(to right, #16a34a, #065f46); border: 2px solid rgba(34, 197, 94, 0.5); }
+    input { width: 100%; padding: 0.75rem 1rem; background: rgba(15, 23, 42, 0.5); border: 2px solid rgba(168, 85, 247, 0.3); border-radius: 0.5rem; color: white; font-size: 1rem; outline: none; font-family: inherit; }
+    input::placeholder { color: rgba(255, 255, 255, 0.5); }
+    input:focus { border-color: rgba(168, 85, 247, 0.8); box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
     .text-center { text-align: center; }
-    .mb-2 { margin-bottom: 0.5rem; }
-    .mb-4 { margin-bottom: 1rem; }
     .mb-6 { margin-bottom: 1.5rem; }
     .mb-8 { margin-bottom: 2rem; }
     .mb-12 { margin-bottom: 3rem; }
-    .mt-2 { margin-top: 0.5rem; }
     .mt-6 { margin-top: 1.5rem; }
-    
     .icon-lg { width: 6rem; height: 6rem; margin: 0 auto 1.5rem; color: #c084fc; }
     .icon-md { width: 4rem; height: 4rem; margin: 0 auto 1rem; }
     .icon-sm { width: 1.5rem; height: 1.5rem; display: inline-block; margin-right: 0.5rem; }
-    
     .pulse { animation: pulse 2s ease-in-out infinite; }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
-    }
-    
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     .slide-up { animation: slideUp 0.5s ease-out; }
-    
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes countdown {
-      0% { transform: scale(1); opacity: 1; }
-      100% { transform: scale(2); opacity: 0; }
-    }
-    
-    .countdown-num {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 10rem;
-      z-index: 100;
-      animation: countdown 1s ease-out;
-    }
-    
-    .overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 99;
-    }
-    
-    .powerup-icon {
-      font-size: 2rem;
-      padding: 0.5rem;
-      background: rgba(88, 28, 135, 0.3);
-      border: 2px solid rgba(168, 85, 247, 0.5);
-      border-radius: 0.5rem;
-      display: inline-block;
-      margin: 0.25rem;
-    }
-    
-    .player-card {
-      background: rgba(15, 23, 42, 0.5);
-      border: 2px solid rgba(168, 85, 247, 0.5);
-      border-radius: 0.75rem;
-      padding: 1.5rem;
-      text-align: center;
-    }
-    
-    .code-display {
-      background: rgba(88, 28, 135, 0.3);
-      border: 2px solid rgba(168, 85, 247, 0.5);
-      padding: 1rem 2rem;
-      border-radius: 999px;
-      display: inline-block;
-      margin-bottom: 1.5rem;
-    }
-    
-    .error-box, .success-box {
-      position: fixed;
-      top: 1rem;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 1rem 1.5rem;
-      border-radius: 0.5rem;
-      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-      z-index: 100;
-      max-width: 28rem;
-      color: white;
-    }
-    
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes countdown { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+    .countdown-num { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10rem; z-index: 100; animation: countdown 1s ease-out; }
+    .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 99; }
+    .powerup-icon { font-size: 2rem; padding: 0.5rem; background: rgba(88, 28, 135, 0.3); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 0.5rem; display: inline-block; margin: 0.25rem; }
+    .player-card { background: rgba(15, 23, 42, 0.5); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 0.75rem; padding: 1.5rem; text-align: center; }
+    .code-display { background: rgba(88, 28, 135, 0.3); border: 2px solid rgba(168, 85, 247, 0.5); padding: 1rem 2rem; border-radius: 999px; display: inline-block; margin-bottom: 1.5rem; }
+    .error-box, .success-box { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 100; max-width: 28rem; color: white; }
     .error-box { background: #dc2626; }
     .success-box { background: #16a34a; }
-    
-    .announcement {
-      position: fixed;
-      top: 1rem;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(88, 28, 135, 0.9);
-      border: 2px solid rgba(168, 85, 247, 0.5);
-      padding: 1rem 2rem;
-      border-radius: 0.75rem;
-      z-index: 100;
-      max-width: 56rem;
-      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
-    }
-    
-    .status-indicator {
-      position: fixed;
-      bottom: 1rem;
-      right: 1rem;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      font-size: 0.75rem;
-    }
-    
-    .info-box {
-      background: rgba(59, 130, 246, 0.2);
-      border: 2px solid rgba(59, 130, 246, 0.5);
-      border-radius: 0.5rem;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    .loading {
-      text-align: center;
-      padding: 4rem;
-    }
-    
-    .loading-spinner {
-      width: 3rem;
-      height: 3rem;
-      border: 4px solid rgba(168, 85, 247, 0.3);
-      border-top-color: #c084fc;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 1rem;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    @media (max-width: 768px) {
-      .grid-2 { grid-template-columns: 1fr; }
-    }
+    .announcement { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); background: rgba(88, 28, 135, 0.9); border: 2px solid rgba(168, 85, 247, 0.5); padding: 1rem 2rem; border-radius: 0.75rem; z-index: 100; max-width: 56rem; box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+    .status-indicator { position: fixed; bottom: 1rem; right: 1rem; background: rgba(0, 0, 0, 0.8); padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.75rem; z-index: 50; cursor: pointer; }
+    .info-box { background: rgba(59, 130, 246, 0.2); border: 2px solid rgba(59, 130, 246, 0.5); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div id="app"></div>
-  
-  <div id="loading" class="container" style="padding-top: 4rem;">
-    <div class="loading">
-      <div class="loading-spinner"></div>
-      <p style="color: #d8b4fe;">Connecting to server...</p>
-    </div>
-  </div>
 
   <script>
-    console.log('Script started');
+    // Use BroadcastChannel for same-device multiplayer (works in multiple tabs)
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('trivia_sync') : null;
+    const games = {};
     
-    // Use a shared storage ID so all users can see each other's games
-    const STORAGE_ID = 'triviatournament2024';
-    const API_BASE = `https://jsonbox.io/${STORAGE_ID}`;
-    
-    const storage = {
-      async get(key) {
-        try {
-          const response = await fetch(`${API_BASE}/${key}`);
-          if (response.ok) {
-            const data = await response.json();
-            return { key, value: JSON.stringify(data) };
-          }
-          return null;
-        } catch (e) {
-          console.error('Storage get error:', e);
-          return null;
-        }
-      },
-      
-      async set(key, value) {
-        try {
-          const data = JSON.parse(value);
-          // Use PUT to update or POST to create
-          await fetch(`${API_BASE}/${key}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-          return { key, value };
-        } catch (e) {
-          console.error('Storage set error:', e);
-          return null;
-        }
-      }
-    };
-
-    // App state
     let state = {
       view: 'home',
       hostName: '',
@@ -324,7 +75,6 @@
       announcement: ''
     };
 
-    // Helper functions
     function generateCode() {
       return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
@@ -332,29 +82,40 @@
     function showError(msg) {
       state.error = msg;
       render();
-      setTimeout(() => {
-        state.error = '';
-        render();
-      }, 3000);
+      setTimeout(() => { state.error = ''; render(); }, 3000);
     }
 
     function showSuccess(msg) {
       state.success = msg;
       render();
-      setTimeout(() => {
-        state.success = '';
-        render();
-      }, 3000);
+      setTimeout(() => { state.success = ''; render(); }, 3000);
     }
 
-    // Game functions
-    async function createGame() {
+    function broadcast(data) {
+      if (bc) bc.postMessage(data);
+    }
+
+    if (bc) {
+      bc.onmessage = (event) => {
+        if (event.data.type === 'game_update') {
+          games[event.data.code] = event.data.game;
+          if (state.gameCode === event.data.code) {
+            state.currentGame = event.data.game;
+            if (event.data.game.announcement) {
+              state.announcement = event.data.game.announcement;
+            }
+            render();
+          }
+        }
+      };
+    }
+
+    function createGame() {
       if (!state.hostName || !state.theme) {
         showError('Please fill in all fields');
         return;
       }
 
-      showSuccess('Creating game...');
       const code = generateCode();
       const newGame = {
         code,
@@ -363,35 +124,32 @@
         mode: state.gameMode,
         players: [{ name: state.hostName, id: Date.now(), isHost: true }],
         status: 'lobby',
-        announcement: '',
-        created: Date.now()
+        announcement: ''
       };
 
-      await storage.set(code, JSON.stringify(newGame));
+      games[code] = newGame;
+      broadcast({ type: 'game_update', code, game: newGame });
+      
       state.gameCode = code;
       state.playerName = state.hostName;
       state.currentGame = newGame;
       state.view = 'lobby';
-      showSuccess('Game created! Share code: ' + code);
-      startPolling();
+      showSuccess('Game created! Code: ' + code);
     }
 
-    async function joinGame() {
+    function joinGame() {
       if (!state.playerName || !state.gameCode) {
         showError('Please fill in all fields');
         return;
       }
 
-      showSuccess('Joining game...');
-      const result = await storage.get(state.gameCode);
+      const game = games[state.gameCode];
       
-      if (!result) {
-        showError('Game not found! Check the code.');
+      if (!game) {
+        showError('Game not found! Make sure host created it first.');
         return;
       }
 
-      const game = JSON.parse(result.value);
-      
       if (game.status !== 'lobby') {
         showError('Game already started!');
         return;
@@ -400,13 +158,12 @@
       const exists = game.players.find(p => p.name === state.playerName);
       if (!exists) {
         game.players.push({ name: state.playerName, id: Date.now(), isHost: false });
-        await storage.set(state.gameCode, JSON.stringify(game));
+        broadcast({ type: 'game_update', code: state.gameCode, game });
       }
 
       state.currentGame = game;
       state.view = 'lobby';
       showSuccess('Joined successfully!');
-      startPolling();
     }
 
     async function startTournament() {
@@ -423,7 +180,7 @@
 
       state.currentGame.announcement = `MATCHUPS: ${matchups}`;
       state.currentGame.status = 'playing';
-      await storage.set(state.gameCode, JSON.stringify(state.currentGame));
+      broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
       
       state.announcement = state.currentGame.announcement;
       render();
@@ -432,7 +189,8 @@
       
       state.announcement = '';
       state.currentGame.announcement = '';
-      await storage.set(state.gameCode, JSON.stringify(state.currentGame));
+      broadcast({ type: 'game_update', code: state.gameCode, game: state.currentGame });
+      render();
       
       for (let i = 3; i > 0; i--) {
         state.countdown = i;
@@ -445,60 +203,20 @@
       render();
     }
 
-    // Polling
-    let pollInterval;
-    async function startPolling() {
-      if (pollInterval) clearInterval(pollInterval);
-      pollInterval = setInterval(async () => {
-        const result = await storage.get(state.gameCode);
-        if (result) {
-          const game = JSON.parse(result.value);
-          state.currentGame = game;
-          if (game.announcement && state.view === 'lobby') {
-            state.announcement = game.announcement;
-          }
-          render();
-        }
-      }, 3000);
-    }
-
-    // Icons
     const icons = {
       trophy: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:100%;height:100%"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>`,
       users: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:100%;height:100%"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`,
       crown: `<svg fill="currentColor" viewBox="0 0 20 20" style="width:100%;height:100%"><path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clip-rule="evenodd"/></svg>`
     };
 
-    // Render function
     function render() {
       const app = document.getElementById('app');
-      document.getElementById('loading').style.display = 'none';
-      
       let html = '';
 
-      if (state.error) {
-        html += `<div class="error-box">${state.error}</div>`;
-      }
-      if (state.success) {
-        html += `<div class="success-box">${state.success}</div>`;
-      }
-
-      if (state.countdown > 0) {
-        html += `
-          <div class="overlay">
-            <div class="countdown-num title glow">${state.countdown}</div>
-          </div>
-        `;
-      }
-
-      if (state.announcement) {
-        html += `
-          <div class="announcement">
-            <div style="font-size:0.75rem;color:#d8b4fe;margin-bottom:0.25rem">ANNOUNCEMENT</div>
-            <div class="title" style="font-size:1.25rem">${state.announcement}</div>
-          </div>
-        `;
-      }
+      if (state.error) html += `<div class="error-box">${state.error}</div>`;
+      if (state.success) html += `<div class="success-box">${state.success}</div>`;
+      if (state.countdown > 0) html += `<div class="overlay"><div class="countdown-num title glow">${state.countdown}</div></div>`;
+      if (state.announcement) html += `<div class="announcement"><div style="font-size:0.75rem;color:#d8b4fe;margin-bottom:0.25rem">ANNOUNCEMENT</div><div class="title" style="font-size:1.25rem">${state.announcement}</div></div>`;
 
       if (state.view === 'home') {
         html += `
@@ -507,25 +225,22 @@
               <div class="icon-lg pulse">${icons.trophy}</div>
               <h1 class="title glow" style="font-size:4.5rem;margin-bottom:1rem">TRIVIA<br/>TOURNAMENT</h1>
               <p style="font-size:1.125rem;color:#d8b4fe">Battle in bracket-style trivia with epic powerups!</p>
-              <p style="font-size:0.875rem;color:#9ca3af;margin-top:1rem">✅ TRUE multiplayer • Works across ALL devices!</p>
+              <p style="font-size:0.875rem;color:#9ca3af;margin-top:1rem">✅ Works instantly • Test in multiple tabs!</p>
             </div>
-            
             <div class="info-box text-center">
-              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">🌐 REAL MULTIPLAYER</div>
-              <p style="font-size:0.75rem;color:#bfdbfe">Friends on different devices can join your game with the code!</p>
+              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">📱 MULTIPLAYER MODE</div>
+              <p style="font-size:0.75rem;color:#bfdbfe">Open in multiple browser tabs to play together!</p>
             </div>
-            
             <div class="grid-2">
               <button class="btn-purple card" onclick="state.view='create';render()" style="padding:2rem">
                 <div class="icon-md" style="color:#c084fc">${icons.crown}</div>
                 <div class="title" style="font-size:1.5rem;margin-bottom:0.5rem">HOST GAME</div>
-                <p style="font-size:0.875rem;color:#e9d5ff">Create a tournament</p>
+                <p style="font-size:0.875rem;color:#e9d5ff">Create tournament</p>
               </button>
-              
               <button class="btn-blue card" onclick="state.view='join';render()" style="padding:2rem">
                 <div class="icon-md" style="color:#60a5fa">${icons.users}</div>
                 <div class="title" style="font-size:1.5rem;margin-bottom:0.5rem">JOIN GAME</div>
-                <p style="font-size:0.875rem;color:#bfdbfe">Enter game code</p>
+                <p style="font-size:0.875rem;color:#bfdbfe">Enter code</p>
               </button>
             </div>
           </div>
@@ -534,35 +249,30 @@
         html += `
           <div class="container-sm slide-up" style="padding-top:4rem">
             <button onclick="state.view='home';render()" class="mb-8" style="background:transparent;color:#c084fc;padding:0.5rem 1rem">← Back</button>
-            
             <div class="card">
               <div class="icon-md mb-6" style="color:#c084fc">${icons.crown}</div>
               <h2 class="title text-center mb-8" style="font-size:1.875rem">CREATE TOURNAMENT</h2>
-              
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#d8b4fe">YOUR NAME</label>
-                <input type="text" id="hostName" placeholder="Enter your name" value="${state.hostName}" onkeyup="state.hostName=this.value">
+                <input type="text" placeholder="Enter your name" value="${state.hostName}" oninput="state.hostName=this.value">
               </div>
-              
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#d8b4fe">TRIVIA THEME</label>
-                <input type="text" id="theme" placeholder="e.g., Movies, Science, History" value="${state.theme}" onkeyup="state.theme=this.value">
+                <input type="text" placeholder="e.g., Movies, Science, History" value="${state.theme}" oninput="state.theme=this.value">
               </div>
-              
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.75rem;color:#d8b4fe">GAME MODE</label>
                 <div class="grid-2">
-                  <button onclick="state.gameMode='normal';render()" style="padding:1rem;background:${state.gameMode==='normal'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='normal'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
+                  <button type="button" onclick="state.gameMode='normal';render()" style="padding:1rem;background:${state.gameMode==='normal'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='normal'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
                     <div style="font-weight:700;margin-bottom:0.25rem">NORMAL</div>
                     <div style="font-size:0.75rem;color:#9ca3af">Classic trivia</div>
                   </button>
-                  <button onclick="state.gameMode='special';render()" style="padding:1rem;background:${state.gameMode==='special'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='special'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
+                  <button type="button" onclick="state.gameMode='special';render()" style="padding:1rem;background:${state.gameMode==='special'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='special'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
                     <div style="font-weight:700;margin-bottom:0.25rem">SPECIAL</div>
                     <div style="font-size:0.75rem;color:#9ca3af">With powerups!</div>
                   </button>
                 </div>
               </div>
-              
               <button onclick="createGame()" ${!state.hostName||!state.theme?'disabled':''} class="btn-purple title" style="width:100%;font-size:1.25rem">CREATE GAME</button>
             </div>
           </div>
@@ -571,21 +281,17 @@
         html += `
           <div class="container-sm slide-up" style="padding-top:4rem">
             <button onclick="state.view='home';render()" class="mb-8" style="background:transparent;color:#c084fc;padding:0.5rem 1rem">← Back</button>
-            
             <div class="card">
               <div class="icon-md mb-6" style="color:#60a5fa">${icons.users}</div>
               <h2 class="title text-center mb-8" style="font-size:1.875rem">JOIN TOURNAMENT</h2>
-              
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#d8b4fe">YOUR NAME</label>
-                <input type="text" id="playerName" placeholder="Enter your name" value="${state.playerName}" onkeyup="state.playerName=this.value">
+                <input type="text" placeholder="Enter your name" value="${state.playerName}" oninput="state.playerName=this.value">
               </div>
-              
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#d8b4fe">GAME CODE</label>
-                <input type="text" id="gameCode" placeholder="XXXXXX" maxlength="6" value="${state.gameCode}" onkeyup="state.gameCode=this.value.toUpperCase();this.value=this.value.toUpperCase()" style="text-align:center;font-size:1.5rem;letter-spacing:0.1em;text-transform:uppercase">
+                <input type="text" placeholder="XXXXXX" maxlength="6" value="${state.gameCode}" oninput="state.gameCode=this.value.toUpperCase()" style="text-align:center;font-size:1.5rem;letter-spacing:0.1em;text-transform:uppercase">
               </div>
-              
               <button onclick="joinGame()" ${!state.playerName||!state.gameCode?'disabled':''} class="btn-blue title" style="width:100%;font-size:1.25rem">JOIN GAME</button>
             </div>
           </div>
@@ -599,13 +305,9 @@
                 <div style="font-size:0.875rem;color:#d8b4fe;margin-bottom:0.25rem">GAME CODE</div>
                 <div class="title" style="font-size:2.25rem;letter-spacing:0.1em">${state.currentGame.code}</div>
               </div>
-              
-              <h2 class="title mb-2" style="font-size:1.875rem">WAITING FOR PLAYERS</h2>
+              <h2 class="title" style="font-size:1.875rem;margin-bottom:0.5rem">WAITING FOR PLAYERS</h2>
               <p style="color:#d8b4fe">Theme: <span style="font-weight:600;color:white">${state.currentGame.theme}</span></p>
-              <p style="font-size:0.875rem;color:#c084fc;margin-top:0.5rem">
-                Mode: <span style="font-weight:600;color:white">${state.currentGame.mode==='special'?'⚡ SPECIAL (Powerups!)':'NORMAL'}</span>
-              </p>
-              
+              <p style="font-size:0.875rem;color:#c084fc;margin-top:0.5rem">Mode: <span style="font-weight:600;color:white">${state.currentGame.mode==='special'?'⚡ SPECIAL (Powerups!)':'NORMAL'}</span></p>
               ${state.currentGame.mode==='special'?`
               <div class="mt-6" style="display:inline-block;background:rgba(124,45,18,0.3);padding:1rem;border-radius:0.5rem;border:2px solid rgba(168,85,247,0.5)">
                 <div style="font-size:0.75rem;color:#9ca3af;margin-bottom:0.5rem">AVAILABLE POWERUPS:</div>
@@ -620,7 +322,6 @@
               </div>
               `:''}
             </div>
-            
             <div class="grid-3 mb-12">
               ${state.currentGame.players.map(p => `
                 <div class="player-card">
@@ -630,7 +331,6 @@
                 </div>
               `).join('')}
             </div>
-            
             ${isHost?`
             <div style="text-align:center">
               <button onclick="startTournament()" ${state.currentGame.players.length<2?'disabled':''} class="btn-green title" style="font-size:1.5rem;padding:1rem 3rem">
@@ -643,19 +343,16 @@
       }
 
       html += `
-        <div class="status-indicator">
-          <div style="color:#4ade80">✅ Multiplayer ready!</div>
-          <div style="color:#9ca3af">Cloud-synced across devices</div>
+        <div class="status-indicator" onclick="this.style.display='none'" title="Click to dismiss">
+          <div style="color:#4ade80">✅ Ready to play!</div>
+          <div style="color:#9ca3af">Open multiple tabs • Click to hide</div>
         </div>
       `;
 
       app.innerHTML = html;
     }
 
-    // Initialize
-    console.log('Initializing app');
     render();
-    console.log('App rendered');
   </script>
 </body>
 </html>
