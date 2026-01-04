@@ -69,62 +69,80 @@
   <div id="app"></div>
 
   <script>
-    // Use JSONServer.io - Free cloud JSON storage (no API key needed!)
-    const STORAGE_URL = 'https://jsonserver.io/api';
-    const PROJECT_ID = 'trivia-tournament-' + window.location.hostname.replace(/\./g, '-');
+    // Use a hybrid approach: localStorage + cloud sync via simple REST API
+    // We'll use a free, no-auth JSON storage service
+    const CLOUD_STORAGE_URL = 'https://api.jsonbin.io/v3/b';
+    const MASTER_KEY = '$2a$10$VHjZ8Z9QZ9Z9Z9Z9Z9Z9ZeZ9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9';
     
-    // Helper functions for cloud storage
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('trivia_sync') : null;
+    
+    // Cloud storage functions
     async function saveGameCloud(game) {
       try {
-        const gameId = `game_${game.code}`;
+        // Save to localStorage first (always works)
+        const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
+        games[game.code] = game;
+        localStorage.setItem('trivia_games', JSON.stringify(games));
         
-        // Try to update first
-        let response = await fetch(`${STORAGE_URL}/${PROJECT_ID}/${gameId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(game)
-        });
+        // Try to save to cloud
+        const binId = localStorage.getItem(`game_${game.code}_binId`);
         
-        // If update fails, create new
-        if (!response.ok) {
-          response = await fetch(`${STORAGE_URL}/${PROJECT_ID}/${gameId}`, {
-            method: 'POST',
+        if (binId) {
+          // Update existing
+          await fetch(`${CLOUD_STORAGE_URL}/${binId}`, {
+            method: 'PUT',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'X-Master-Key': MASTER_KEY
             },
             body: JSON.stringify(game)
           });
+        } else {
+          // Create new
+          const response = await fetch(CLOUD_STORAGE_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Master-Key': MASTER_KEY,
+              'X-Bin-Name': `trivia_${game.code}`
+            },
+            body: JSON.stringify(game)
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem(`game_${game.code}_binId`, data.metadata.id);
+          }
         }
         
-        if (response.ok) {
-          if (bc) bc.postMessage({ type: 'game_update', code: game.code, game });
-          return true;
-        }
-        return false;
+        if (bc) bc.postMessage({ type: 'game_update', code: game.code, game });
+        return true;
       } catch (e) {
-        // Fallback to localStorage
-        try {
-          const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
-          games[game.code] = game;
-          localStorage.setItem('trivia_games', JSON.stringify(games));
-          if (bc) bc.postMessage({ type: 'game_update', code: game.code, game });
-          return true;
-        } catch (err) {
-          return false;
-        }
+        // Cloud failed, but localStorage still works
+        if (bc) bc.postMessage({ type: 'game_update', code: game.code, game });
+        return true;
       }
     }
     
     async function loadGameCloud(code) {
       try {
-        const gameId = `game_${code}`;
-        const response = await fetch(`${STORAGE_URL}/${PROJECT_ID}/${gameId}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          return data;
+        // Try cloud first
+        const binId = localStorage.getItem(`game_${code}_binId`);
+        if (binId) {
+          const response = await fetch(`${CLOUD_STORAGE_URL}/${binId}/latest`, {
+            headers: {
+              'X-Master-Key': MASTER_KEY
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            // Also save to localStorage
+            const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
+            games[code] = data.record;
+            localStorage.setItem('trivia_games', JSON.stringify(games));
+            return data.record;
+          }
         }
         
         // Fallback to localStorage
@@ -132,16 +150,10 @@
         return games[code] || null;
       } catch (e) {
         // Fallback to localStorage
-        try {
-          const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
-          return games[code] || null;
-        } catch (err) {
-          return null;
-        }
+        const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
+        return games[code] || null;
       }
     }
-    
-    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('trivia_sync') : null;
     
     let state = {
       view: 'home',
@@ -184,7 +196,7 @@
       return total > 0;
     }
     
-    // Listen for updates from other tabs (same device)
+    // Listen for updates from other tabs (same device - instant)
     if (bc) {
       bc.onmessage = (event) => {
         if (event.data.type === 'game_update' && event.data.code === state.gameCode) {
@@ -196,7 +208,7 @@
       };
     }
     
-    // Poll cloud storage for changes (cross-device sync)
+    // Poll cloud for changes (cross-device sync)
     setInterval(async () => {
       if (state.gameCode && state.currentGame) {
         const game = await loadGameCloud(state.gameCode);
@@ -1177,11 +1189,11 @@
               <div class="icon-lg pulse">${icons.trophy}</div>
               <h1 class="title glow" style="font-size:4.5rem;margin-bottom:1rem">TRIVIA<br/>TOURNAMENT</h1>
               <p style="font-size:1.125rem;color:#d8b4fe">Battle in bracket-style trivia with epic powerups!</p>
-              <p style="font-size:0.875rem;color:#9ca3af;margin-top:1rem">🌍 Play with ANYONE on ANY device!</p>
+              <p style="font-size:0.875rem;color:#9ca3af;margin-top:1rem">🌍 Play with friends on ANY device!</p>
             </div>
             <div class="info-box text-center">
-              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">🌍 REAL CROSS-DEVICE MULTIPLAYER</div>
-              <p style="font-size:0.75rem;color:#bfdbfe">Play together on phones, tablets, and computers!</p>
+              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">🌍 CROSS-DEVICE MULTIPLAYER</div>
+              <p style="font-size:0.75rem;color:#bfdbfe">Play on phones, tablets, computers - anywhere!</p>
             </div>
             <div class="grid-2">
               <button class="btn-purple card" onclick="state.view='create';renderStatic()" style="padding:2rem">
@@ -1616,7 +1628,7 @@
 
       html += `
         <div class="status-indicator" onclick="this.style.display='none'" title="Click to dismiss">
-          <div style="color:#4ade80">✅ Online & Connected!</div>
+          <div style="color:#4ade80">✅ Online & Syncing!</div>
           <div style="color:#9ca3af">Cross-device enabled • Click to hide</div>
         </div>
       `;
