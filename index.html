@@ -41,8 +41,12 @@
     @keyframes countdown { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
     .countdown-num { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10rem; z-index: 100; animation: countdown 1s ease-out; }
     .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 99; }
-    .powerup-icon { font-size: 2rem; padding: 0.5rem; background: rgba(88, 28, 135, 0.3); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 0.5rem; display: inline-block; margin: 0.25rem; }
-    .player-card { background: rgba(15, 23, 42, 0.5); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 0.75rem; padding: 1.5rem; text-align: center; }
+    .powerup-icon { font-size: 2rem; padding: 0.5rem; background: rgba(88, 28, 135, 0.3); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 0.5rem; display: inline-block; margin: 0.25rem; cursor: pointer; transition: all 0.3s; }
+    .powerup-icon:hover { transform: scale(1.1); background: rgba(168, 85, 247, 0.5); }
+    .player-card { background: rgba(15, 23, 42, 0.5); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 0.75rem; padding: 1.5rem; text-align: center; position: relative; }
+    .player-card.frozen { border-color: #60a5fa; background: rgba(59, 130, 246, 0.2); }
+    .player-card.eliminated { opacity: 0.5; border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1); }
+    .frozen-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(96, 165, 250, 0.3); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 3rem; }
     .code-display { background: rgba(88, 28, 135, 0.3); border: 2px solid rgba(168, 85, 247, 0.5); padding: 1rem 2rem; border-radius: 999px; display: inline-block; margin-bottom: 1.5rem; }
     .error-box, .success-box { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 100; max-width: 28rem; color: white; }
     .error-box { background: #dc2626; }
@@ -50,6 +54,14 @@
     .announcement { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); background: rgba(88, 28, 135, 0.9); border: 2px solid rgba(168, 85, 247, 0.5); padding: 1rem 2rem; border-radius: 0.75rem; z-index: 100; max-width: 56rem; box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
     .status-indicator { position: fixed; bottom: 1rem; right: 1rem; background: rgba(0, 0, 0, 0.8); padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.75rem; z-index: 50; cursor: pointer; }
     .info-box { background: rgba(59, 130, 246, 0.2); border: 2px solid rgba(59, 130, 246, 0.5); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; }
+    .timer-circle { width: 120px; height: 120px; margin: 0 auto 2rem; position: relative; }
+    .timer-circle svg { transform: rotate(-90deg); }
+    .timer-circle circle { fill: none; stroke-width: 8; }
+    .timer-bg { stroke: rgba(255, 255, 255, 0.1); }
+    .timer-progress { stroke: #10b981; transition: stroke 0.3s, stroke-dashoffset 1s linear; }
+    .timer-progress.warning { stroke: #f59e0b; }
+    .timer-progress.danger { stroke: #ef4444; }
+    .timer-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5rem; font-weight: 900; }
     @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -57,8 +69,79 @@
   <div id="app"></div>
 
   <script>
-    // Using a simple, free cloud storage API
-    const STORAGE_URL = 'https://api.jsonstorage.net/v1/json';
+    // Use JSONServer.io - Free cloud JSON storage (no API key needed!)
+    const STORAGE_URL = 'https://jsonserver.io/api';
+    const PROJECT_ID = 'trivia-tournament-' + window.location.hostname.replace(/\./g, '-');
+    
+    // Helper functions for cloud storage
+    async function saveGameCloud(game) {
+      try {
+        const gameId = `game_${game.code}`;
+        
+        // Try to update first
+        let response = await fetch(`${STORAGE_URL}/${PROJECT_ID}/${gameId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(game)
+        });
+        
+        // If update fails, create new
+        if (!response.ok) {
+          response = await fetch(`${STORAGE_URL}/${PROJECT_ID}/${gameId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(game)
+          });
+        }
+        
+        if (response.ok) {
+          if (bc) bc.postMessage({ type: 'game_update', code: game.code, game });
+          return true;
+        }
+        return false;
+      } catch (e) {
+        // Fallback to localStorage
+        try {
+          const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
+          games[game.code] = game;
+          localStorage.setItem('trivia_games', JSON.stringify(games));
+          if (bc) bc.postMessage({ type: 'game_update', code: game.code, game });
+          return true;
+        } catch (err) {
+          return false;
+        }
+      }
+    }
+    
+    async function loadGameCloud(code) {
+      try {
+        const gameId = `game_${code}`;
+        const response = await fetch(`${STORAGE_URL}/${PROJECT_ID}/${gameId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          return data;
+        }
+        
+        // Fallback to localStorage
+        const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
+        return games[code] || null;
+      } catch (e) {
+        // Fallback to localStorage
+        try {
+          const games = JSON.parse(localStorage.getItem('trivia_games') || '{}');
+          return games[code] || null;
+        } catch (err) {
+          return null;
+        }
+      }
+    }
+    
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('trivia_sync') : null;
     
     let state = {
       view: 'home',
@@ -76,11 +159,145 @@
       selectedAnswer: null,
       hasAnswered: false,
       timeLeft: 0,
-      storageId: null
+      isFrozen: false,
+      freezeTimeLeft: 0,
+      answerTime: null, // Track when player answered
+      showPowerupMenu: false // Track if powerup menu is open
     };
 
     let questionTimer = null;
     let pollInterval = null;
+    let freezeTimer = null;
+    let questionStartTime = null; // Track when question started
+    
+    function togglePowerupMenu() {
+      state.showPowerupMenu = !state.showPowerupMenu;
+      renderStatic();
+    }
+    
+    function hasPowerups() {
+      if (!state.currentGame) return false;
+      const myPlayer = state.currentGame.players.find(p => p.name === state.playerName);
+      if (!myPlayer) return false;
+      
+      const total = Object.values(myPlayer.powerups).reduce((sum, count) => sum + count, 0);
+      return total > 0;
+    }
+    
+    // Listen for updates from other tabs (same device)
+    if (bc) {
+      bc.onmessage = (event) => {
+        if (event.data.type === 'game_update' && event.data.code === state.gameCode) {
+          const game = event.data.game;
+          if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
+            syncGameState(game);
+          }
+        }
+      };
+    }
+    
+    // Poll cloud storage for changes (cross-device sync)
+    setInterval(async () => {
+      if (state.gameCode && state.currentGame) {
+        const game = await loadGameCloud(state.gameCode);
+        if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
+          syncGameState(game);
+        }
+      }
+    }, 2000); // Poll every 2 seconds
+    
+    function syncGameState(game) {
+      state.currentGame = game;
+      
+      // Check for attack notifications
+      if (game.attackNotification && game.attackNotification.timestamp > (Date.now() - 5000)) {
+        const attack = game.attackNotification;
+        const myPlayer = game.players.find(p => p.name === state.playerName);
+        
+        // Show notification if this player was attacked (or for Battlestar, everyone)
+        if (attack.attacker !== state.playerName) {
+          if (attack.type === 'freeze') {
+            showError(`⚠️ Uh oh! You just got attacked by ${attack.attacker} with ICE FREEZE! ❄️`);
+          } else if (attack.type === 'fireball' && attack.victim === state.playerName) {
+            const powerupIcons = { freeze: '❄️', shield: '🛡️', double: '✌️', fireball: '🔥', switch: '🔄', star: '⭐' };
+            const lostPowerup = powerupIcons[attack.destroyedPowerup] || attack.destroyedPowerup;
+            showError(`⚠️ Uh oh! ${attack.attacker} hit you with a FIREBALL! 🔥 You lost ${lostPowerup}!`);
+          } else if (attack.type === 'switch' && attack.victim === state.playerName) {
+            showError(`⚠️ Uh oh! ${attack.attacker} used SWITCH on you! 🔄 Your scores were swapped!`);
+          } else if (attack.type === 'star') {
+            state.announcement = `⭐ BATTLESTAR!! ${attack.attacker} triggered the ultimate challenge!`;
+          }
+        }
+      }
+      
+      // Sync bracket results
+      if (game.bracketResults && state.view !== 'bracketResults') {
+        state.view = 'bracketResults';
+      }
+      
+      // Sync podium
+      if (game.status === 'podium') {
+        state.view = 'podium';
+      }
+      
+      // Sync matchup result
+      if (game.matchupResult && state.view !== 'matchupResult') {
+        state.view = 'matchupResult';
+      }
+      
+      // Check if frozen
+      const myPlayer = game.players.find(p => p.name === state.playerName);
+      if (myPlayer && myPlayer.frozenUntil && myPlayer.frozenUntil > Date.now()) {
+        if (!state.isFrozen) {
+          state.isFrozen = true;
+          startFreezeTimer(myPlayer.frozenUntil);
+        }
+      } else {
+        state.isFrozen = false;
+        if (freezeTimer) {
+          clearInterval(freezeTimer);
+          freezeTimer = null;
+        }
+      }
+      
+      if (game.currentQuestion && !state.currentQuestion && !game.isBracketRound) {
+        state.currentQuestion = game.currentQuestion;
+        state.view = 'playing';
+        state.hasAnswered = false;
+        state.selectedAnswer = null;
+        state.timeLeft = 15;
+        questionStartTime = Date.now();
+        startQuestionTimer();
+      }
+      
+      // Sync bracket round
+      if (game.isBracketRound && !state.currentQuestion) {
+        state.currentQuestion = game.currentQuestion;
+        state.view = 'playing';
+        state.hasAnswered = false;
+        state.selectedAnswer = null;
+        state.timeLeft = 15;
+        questionStartTime = Date.now();
+        startQuestionTimer();
+      }
+      
+      // Sync matchup start
+      if (game.currentMatchup && !state.currentQuestion && state.view !== 'matchupResult') {
+        state.currentQuestion = game.currentQuestion;
+        state.view = 'playing';
+        state.hasAnswered = false;
+        state.selectedAnswer = null;
+        state.timeLeft = 15;
+        questionStartTime = Date.now();
+        startQuestionTimer();
+      }
+      
+      if (game.announcement) {
+        state.announcement = game.announcement;
+      }
+      
+      renderStatic();
+    }
 
     // Trivia questions database
     const triviaQuestions = {
@@ -127,96 +344,256 @@
 
     function showError(msg) {
       state.error = msg;
-      render();
-      setTimeout(() => { state.error = ''; render(); }, 3000);
+      renderStatic();
+      setTimeout(() => { state.error = ''; renderStatic(); }, 3000);
     }
 
     function showSuccess(msg) {
       state.success = msg;
-      render();
-      setTimeout(() => { state.success = ''; render(); }, 3000);
+      renderStatic();
+      setTimeout(() => { state.success = ''; renderStatic(); }, 3000);
     }
 
-    // Save game to cloud
-    async function saveGame(game) {
-      try {
-        const storageId = localStorage.getItem(`game_${game.code}_id`);
-        const url = storageId ? 
-          `${STORAGE_URL}/${storageId}` : 
-          `${STORAGE_URL}?apiKey=free`;
+    function startFreezeTimer(frozenUntil) {
+      if (freezeTimer) clearInterval(freezeTimer);
+      
+      freezeTimer = setInterval(() => {
+        const timeLeft = Math.max(0, Math.ceil((frozenUntil - Date.now()) / 1000));
+        state.freezeTimeLeft = timeLeft;
         
-        const response = await fetch(url, {
-          method: storageId ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(game)
+        if (timeLeft <= 0) {
+          state.isFrozen = false;
+          clearInterval(freezeTimer);
+          freezeTimer = null;
+        }
+        
+        renderStatic();
+      }, 100);
+    }
+
+    function startPowerupMode() {
+      if (!state.currentGame) return;
+      
+      state.currentGame.isPowerupMode = true;
+      state.currentGame.powerupQuestionCount = 0;
+      state.currentGame.timestamp = Date.now();
+      saveGameCloud(state.currentGame);
+      
+      startQuestion();
+    }
+
+    function endBracketRound() {
+      // Sort players by bracket scores
+      const bracketPlayers = Object.entries(state.currentGame.bracketScores)
+        .map(([name, score]) => ({ name, score }))
+        .sort((a, b) => b.score - a.score);
+      
+      // Calculate cutoff - top half advances
+      const totalPlayers = bracketPlayers.length;
+      const advancingCount = Math.ceil(totalPlayers / 2);
+      const cutoffScore = bracketPlayers[advancingCount - 1]?.score || 0;
+      
+      // Eliminate bottom half
+      const eliminated = [];
+      bracketPlayers.forEach((player, index) => {
+        if (index >= advancingCount) {
+          const p = state.currentGame.players.find(pl => pl.name === player.name);
+          if (p) {
+            p.eliminated = true;
+            eliminated.push(player.name);
+          }
+        }
+      });
+      
+      // Show bracket results
+      state.currentGame.bracketResults = bracketPlayers;
+      state.currentGame.advancingCount = advancingCount;
+      state.view = 'bracketResults';
+      
+      // Clean up bracket round state
+      state.currentGame.isBracketRound = false;
+      state.currentGame.bracketQuestionCount = 0;
+      state.currentQuestion = null;
+      
+      saveGameCloud(state.currentGame);
+      renderStatic();
+      
+      // After showing results, check for podium or return to lobby
+      setTimeout(() => {
+        if (checkForPodium()) {
+          showPodium();
+        } else {
+          state.view = 'lobby';
+          state.currentGame.status = 'lobby';
+          state.currentGame.bracketResults = null;
+          saveGameCloud(state.currentGame);
+          renderStatic();
+        }
+      }, 5000);
+    }
+
+    function checkForPodium() {
+      if (!state.currentGame) return false;
+      
+      const activePlayers = state.currentGame.players.filter(p => !p.eliminated);
+      
+      // Show podium if 3 or fewer players remain, or if only 1 player left
+      if (activePlayers.length <= 3 && activePlayers.length >= 1) {
+        return true;
+      }
+      
+      return false;
+    }
+
+    function showPodium() {
+      // Sort players by wins (descending)
+      const rankedPlayers = [...state.currentGame.players]
+        .filter(p => !p.eliminated || p.wins > 0)
+        .sort((a, b) => b.wins - a.wins);
+      
+      state.currentGame.rankedPlayers = rankedPlayers;
+      state.currentGame.status = 'podium';
+      state.view = 'podium';
+      saveGameCloud(state.currentGame);
+      renderStatic();
+    }
+
+    function usePowerup(powerupType) {
+      if (!state.currentGame || state.isFrozen) return;
+      
+      const myPlayer = state.currentGame.players.find(p => p.name === state.playerName);
+      if (!myPlayer || !myPlayer.powerups[powerupType] || myPlayer.powerups[powerupType] <= 0) {
+        showError('You don\'t have this powerup!');
+        return;
+      }
+      
+      if (powerupType === 'freeze') {
+        // Freeze all other players for 3 seconds
+        const freezeUntil = Date.now() + 3000;
+        state.currentGame.players = state.currentGame.players.map(p => {
+          if (p.name !== state.playerName && !p.eliminated) {
+            return { ...p, frozenUntil: freezeUntil };
+          }
+          return p;
         });
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.uri && !storageId) {
-            const id = data.uri.split('/').pop();
-            localStorage.setItem(`game_${game.code}_id`, id);
-            state.storageId = id;
-          }
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('Save error:', error);
-        return false;
-      }
-    }
-
-    // Load game from cloud
-    async function loadGame(code) {
-      try {
-        const storageId = localStorage.getItem(`game_${code}_id`);
-        if (!storageId) return null;
+        myPlayer.powerups.freeze--;
         
-        const response = await fetch(`${STORAGE_URL}/${storageId}?apiKey=free`);
-        if (response.ok) {
-          return await response.json();
-        }
-        return null;
-      } catch (error) {
-        console.error('Load error:', error);
-        return null;
-      }
-    }
-
-    // Start polling for game updates
-    function startPolling() {
-      if (pollInterval) clearInterval(pollInterval);
-      
-      pollInterval = setInterval(async () => {
-        if (state.gameCode) {
-          const game = await loadGame(state.gameCode);
-          if (game && JSON.stringify(game) !== JSON.stringify(state.currentGame)) {
-            state.currentGame = game;
+        // Set attack notification for victims
+        state.currentGame.attackNotification = {
+          type: 'freeze',
+          attacker: state.playerName,
+          timestamp: Date.now()
+        };
+        
+        saveGameCloud(state.currentGame);
+        showSuccess('❄️ Ice Freeze activated! Others frozen for 3 seconds!');
+        renderStatic();
+      } else if (powerupType === 'shield') {
+        myPlayer.hasShield = true;
+        myPlayer.powerups.shield--;
+        saveGameCloud(state.currentGame);
+        showSuccess('🛡️ Shield activated! Protected from elimination!');
+        renderStatic();
+      } else if (powerupType === 'double') {
+        myPlayer.doublePoints = true;
+        myPlayer.powerups.double--;
+        saveGameCloud(state.currentGame);
+        showSuccess('✌️ Double Points activated! Next win counts twice!');
+        renderStatic();
+      } else if (powerupType === 'fireball') {
+        // Remove a random opponent's powerup
+        const opponents = state.currentGame.players.filter(p => 
+          p.name !== state.playerName && !p.eliminated
+        );
+        if (opponents.length > 0) {
+          const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+          const powerupKeys = Object.keys(randomOpponent.powerups).filter(k => randomOpponent.powerups[k] > 0);
+          if (powerupKeys.length > 0) {
+            const randomKey = powerupKeys[Math.floor(Math.random() * powerupKeys.length)];
+            const destroyedPowerup = randomKey;
+            randomOpponent.powerups[randomKey]--;
+            myPlayer.powerups.fireball--;
             
-            // Sync question across all players
-            if (game.currentQuestion && !state.currentQuestion) {
-              state.currentQuestion = game.currentQuestion;
-              state.view = 'playing';
-              state.hasAnswered = false;
-              state.selectedAnswer = null;
-              state.timeLeft = 15;
-            }
+            // Set attack notification for victim
+            state.currentGame.attackNotification = {
+              type: 'fireball',
+              attacker: state.playerName,
+              victim: randomOpponent.name,
+              destroyedPowerup,
+              timestamp: Date.now()
+            };
             
-            if (game.announcement) {
-              state.announcement = game.announcement;
-            }
-            
-            render();
+            saveGameCloud(state.currentGame);
+            showSuccess(`🔥 Fireball! Destroyed ${randomOpponent.name}'s powerup!`);
+          } else {
+            showError('No opponent has powerups to destroy!');
+            return;
           }
+        } else {
+          showError('No opponents to target!');
+          return;
         }
-      }, 1500); // Poll every 1.5 seconds
-    }
-
-    function stopPolling() {
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        pollInterval = null;
+        renderStatic();
+      } else if (powerupType === 'switch') {
+        // Swap positions with random opponent
+        const opponents = state.currentGame.players.filter(p => 
+          p.name !== state.playerName && !p.eliminated
+        );
+        if (opponents.length > 0) {
+          const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+          const tempWins = myPlayer.wins;
+          myPlayer.wins = randomOpponent.wins;
+          randomOpponent.wins = tempWins;
+          myPlayer.powerups.switch--;
+          
+          // Set attack notification for victim
+          state.currentGame.attackNotification = {
+            type: 'switch',
+            attacker: state.playerName,
+            victim: randomOpponent.name,
+            timestamp: Date.now()
+          };
+          
+          saveGameCloud(state.currentGame);
+          showSuccess(`🔄 Switch! Swapped scores with ${randomOpponent.name}!`);
+        } else {
+          showError('No opponents to switch with!');
+          return;
+        }
+        renderStatic();
+      } else if (powerupType === 'star') {
+        // Trigger bracket round - everyone plays, top half advances
+        myPlayer.powerups.star--;
+        state.currentGame.isBracketRound = true;
+        state.currentGame.bracketScores = {};
+        
+        // Initialize bracket scores for all non-eliminated players
+        state.currentGame.players.forEach(p => {
+          if (!p.eliminated) {
+            state.currentGame.bracketScores[p.name] = 0;
+          }
+        });
+        
+        // Set attack notification for everyone
+        state.currentGame.attackNotification = {
+          type: 'star',
+          attacker: state.playerName,
+          timestamp: Date.now()
+        };
+        
+        saveGameCloud(state.currentGame);
+        
+        state.announcement = `⭐ ${state.playerName} activated BATTLESTAR!! Everyone competes - Top half advances!`;
+        renderStatic();
+        
+        setTimeout(() => {
+          state.announcement = '';
+          state.currentGame.attackNotification = null;
+          saveGameCloud(state.currentGame);
+          renderStatic();
+          startQuestion();
+        }, 4000);
       }
     }
 
@@ -232,21 +609,30 @@
         host: state.hostName,
         theme: state.theme,
         mode: state.gameMode,
-        players: [{ name: state.hostName, id: Date.now(), isHost: true }],
+        players: [{ 
+          name: state.hostName, 
+          id: Date.now(), 
+          isHost: true,
+          powerups: { freeze: 0, shield: 0, double: 0, fireball: 0, switch: 0, star: 0 },
+          wins: 0,
+          losses: 0,
+          eliminated: false
+        }],
         status: 'lobby',
         announcement: '',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        round: 0
       };
 
       state.gameCode = code;
       state.playerName = state.hostName;
       state.currentGame = newGame;
       
-      const saved = await saveGame(newGame);
+      const saved = await saveGameCloud(newGame);
       if (saved) {
-        startPolling();
         state.view = 'lobby';
         showSuccess('Game created! Share code: ' + code);
+        renderStatic();
       } else {
         showError('Failed to create game. Try again.');
       }
@@ -258,10 +644,10 @@
         return;
       }
 
-      const game = await loadGame(state.gameCode);
+      const game = await loadGameCloud(state.gameCode);
       
       if (!game) {
-        showError('Game not found! Make sure the host created the game and shared the correct code.');
+        showError('Game not found! Make sure the host created the game first and you have the correct code.');
         return;
       }
 
@@ -272,99 +658,306 @@
 
       const exists = game.players.find(p => p.name === state.playerName);
       if (!exists) {
-        game.players.push({ name: state.playerName, id: Date.now(), isHost: false });
+        game.players.push({ 
+          name: state.playerName, 
+          id: Date.now(), 
+          isHost: false,
+          powerups: { freeze: 0, shield: 0, double: 0, fireball: 0, switch: 0, star: 0 },
+          wins: 0,
+          losses: 0,
+          eliminated: false
+        });
         game.timestamp = Date.now();
-        await saveGame(game);
+        await saveGameCloud(game);
       }
 
       state.currentGame = game;
-      state.gameCode = state.gameCode;
       state.view = 'lobby';
-      startPolling();
       showSuccess('Joined successfully!');
+      renderStatic();
     }
 
     async function startTournament() {
-      if (!state.currentGame || state.currentGame.players.length < 2) {
+      if (!state.currentGame || state.currentGame.players.filter(p => !p.eliminated).length < 2) {
         showError('Need at least 2 players!');
         return;
       }
 
-      const matchups = state.currentGame.players.map((p, i) => 
-        i % 2 === 0 && i + 1 < state.currentGame.players.length
-          ? `${p.name} vs ${state.currentGame.players[i + 1].name}`
-          : ''
-      ).filter(Boolean).join(' • ');
+      // Create bracket matchups
+      const activePlayers = state.currentGame.players.filter(p => !p.eliminated);
+      const matchups = [];
+      
+      for (let i = 0; i < activePlayers.length; i += 2) {
+        if (i + 1 < activePlayers.length) {
+          matchups.push({
+            player1: activePlayers[i].name,
+            player2: activePlayers[i + 1].name,
+            winner: null
+          });
+        } else {
+          // Odd player gets a bye
+          matchups.push({
+            player1: activePlayers[i].name,
+            player2: null,
+            winner: activePlayers[i].name
+          });
+        }
+      }
 
-      state.currentGame.announcement = `MATCHUPS: ${matchups}`;
+      state.currentGame.matchups = matchups;
+      state.currentGame.currentMatchIndex = 0;
+      state.currentGame.round = (state.currentGame.round || 0) + 1;
       state.currentGame.status = 'playing';
-      state.currentGame.timestamp = Date.now();
-      await saveGame(state.currentGame);
+      
+      const matchupText = matchups.filter(m => m.player2).map(m => 
+        `${m.player1} vs ${m.player2}`
+      ).join(' • ');
+
+      state.currentGame.announcement = `ROUND ${state.currentGame.round} - ${matchupText}`;
+      saveGameCloud(state.currentGame);
       
       state.announcement = state.currentGame.announcement;
-      render();
+      renderStatic();
       
       await new Promise(r => setTimeout(r, 5000));
       
       state.announcement = '';
       state.currentGame.announcement = '';
-      state.currentGame.timestamp = Date.now();
-      await saveGame(state.currentGame);
-      render();
+      saveGameCloud(state.currentGame);
+      renderStatic();
       
       for (let i = 3; i > 0; i--) {
         state.countdown = i;
-        render();
+        renderStatic();
         await new Promise(r => setTimeout(r, 1000));
       }
       
       state.countdown = 0;
       
-      // Start the first question
+      // Start the first matchup
+      startMatchup(0);
+    }
+
+    function startMatchup(matchupIndex) {
+      const matchup = state.currentGame.matchups[matchupIndex];
+      
+      // If it's a bye, skip to next matchup
+      if (!matchup.player2) {
+        state.currentGame.currentMatchIndex++;
+        if (state.currentGame.currentMatchIndex < state.currentGame.matchups.length) {
+          startMatchup(state.currentGame.currentMatchIndex);
+        } else {
+          endRound();
+        }
+        return;
+      }
+      
+      state.currentGame.currentMatchup = matchup;
+      state.currentGame.matchupAnswers = {};
+      saveGameCloud(state.currentGame);
+      
       startQuestion();
     }
 
-    async function startQuestion() {
-      // Clear any existing timer
-      if (questionTimer) {
-        clearInterval(questionTimer);
-        questionTimer = null;
+    async function checkMatchupResult() {
+      const matchup = state.currentGame.currentMatchup;
+      const answers = state.currentGame.matchupAnswers;
+      
+      const p1Answer = answers[matchup.player1];
+      const p2Answer = answers[matchup.player2];
+      
+      // Both players must have answered
+      if (!p1Answer || !p2Answer) {
+        return;
       }
       
+      const p1Correct = p1Answer.isCorrect;
+      const p2Correct = p2Answer.isCorrect;
+      
+      // If both wrong, show result and play another question!
+      if (!p1Correct && !p2Correct) {
+        state.currentGame.matchupResult = {
+          bothWrong: true,
+          p1: { name: matchup.player1, ...p1Answer },
+          p2: { name: matchup.player2, ...p2Answer }
+        };
+        
+        saveGameCloud(state.currentGame);
+        
+        // Show both wrong result
+        state.view = 'matchupResult';
+        renderStatic();
+        
+        await new Promise(r => setTimeout(r, 3000));
+        
+        // Clear result and reset for new question
+        state.currentGame.matchupResult = null;
+        state.currentGame.matchupAnswers = {};
+        state.currentQuestion = null;
+        saveGameCloud(state.currentGame);
+        
+        // Play another question!
+        startQuestion();
+        return;
+      }
+      
+      let winner = null;
+      let loser = null;
+      
+      if (p1Correct && !p2Correct) {
+        winner = matchup.player1;
+        loser = matchup.player2;
+      } else if (p2Correct && !p1Correct) {
+        winner = matchup.player2;
+        loser = matchup.player1;
+      } else if (p1Correct && p2Correct) {
+        // Both correct - faster player wins!
+        if (p1Answer.answerTime < p2Answer.answerTime) {
+          winner = matchup.player1;
+          loser = matchup.player2;
+        } else {
+          winner = matchup.player2;
+          loser = matchup.player1;
+        }
+      }
+      
+      // Update matchup
+      matchup.winner = winner;
+      
+      // Eliminate loser
+      const loserPlayer = state.currentGame.players.find(p => p.name === loser);
+      if (loserPlayer) {
+        loserPlayer.eliminated = true;
+      }
+      
+      // Give winner a win
+      const winnerPlayer = state.currentGame.players.find(p => p.name === winner);
+      if (winnerPlayer) {
+        winnerPlayer.wins++;
+      }
+      
+      state.currentGame.matchupResult = {
+        winner,
+        loser,
+        bothWrong: false,
+        p1: { name: matchup.player1, ...p1Answer },
+        p2: { name: matchup.player2, ...p2Answer }
+      };
+      
+      saveGameCloud(state.currentGame);
+      
+      // Show matchup result
+      state.view = 'matchupResult';
+      renderStatic();
+      
+      await new Promise(r => setTimeout(r, 4000));
+      
+      // Move to next matchup
+      state.currentGame.currentMatchIndex++;
+      state.currentGame.matchupResult = null;
+      
+      if (state.currentGame.currentMatchIndex < state.currentGame.matchups.length) {
+        startMatchup(state.currentGame.currentMatchIndex);
+      } else {
+        endRound();
+      }
+    }
+
+    async function endRound() {
+      // Check if we should show podium or start next round
+      const winners = state.currentGame.matchups.map(m => m.winner).filter(Boolean);
+      
+      if (winners.length === 1) {
+        // We have a champion!
+        showPodium();
+      } else if (winners.length <= 3) {
+        // Final few - show podium
+        showPodium();
+      } else {
+        // Create next round
+        state.view = 'lobby';
+        state.currentGame.status = 'lobby';
+        state.currentGame.currentMatchup = null;
+        state.currentGame.matchups = null;
+        state.currentQuestion = null;
+        saveGameCloud(state.currentGame);
+        renderStatic();
+      }
+    }
+
+    function startQuestionTimer() {
+      if (questionTimer) {
+        clearInterval(questionTimer);
+      }
+      
+      questionTimer = setInterval(() => {
+        if (!state.isFrozen) {
+          state.timeLeft--;
+          updateTimerDisplay();
+          
+          if (state.timeLeft <= 0) {
+            clearInterval(questionTimer);
+            questionTimer = null;
+            if (!state.hasAnswered) {
+              showError('Time\'s up!');
+              setTimeout(() => {
+                showResults();
+              }, 2000);
+            }
+          }
+        }
+      }, 1000);
+    }
+
+    function startQuestion() {
       state.view = 'playing';
       state.hasAnswered = false;
       state.selectedAnswer = null;
       state.timeLeft = 15;
+      state.answerTime = null;
       
       const question = getRandomQuestion(state.currentGame.theme);
       state.currentQuestion = question;
       
       state.currentGame.currentQuestion = question;
       state.currentGame.timestamp = Date.now();
-      await saveGame(state.currentGame);
+      questionStartTime = Date.now(); // Track when question started
+      saveGameCloud(state.currentGame);
       
-      render();
+      renderStatic();
+      startQuestionTimer();
+    }
+
+    function updateTimerDisplay() {
+      const timerText = document.getElementById('timer-text');
+      const timerProgress = document.getElementById('timer-progress');
       
-      // Start timer
-      questionTimer = setInterval(() => {
-        state.timeLeft--;
-        render();
+      if (timerText) {
+        timerText.textContent = state.timeLeft;
+      }
+      
+      if (timerProgress) {
+        const progress = (state.timeLeft / 15) * 283; // 283 is circumference
+        timerProgress.style.strokeDashoffset = 283 - progress;
         
-        if (state.timeLeft <= 0) {
-          clearInterval(questionTimer);
-          questionTimer = null;
-          if (!state.hasAnswered) {
-            showError('Time\'s up!');
-            setTimeout(() => {
-              showResults();
-            }, 2000);
-          }
+        if (state.timeLeft <= 5) {
+          timerProgress.classList.add('danger');
+          timerProgress.classList.remove('warning');
+        } else if (state.timeLeft <= 10) {
+          timerProgress.classList.add('warning');
+          timerProgress.classList.remove('danger');
+        } else {
+          timerProgress.classList.remove('warning', 'danger');
         }
-      }, 1000);
+      }
     }
 
     function answerQuestion(answerIndex) {
-      if (state.hasAnswered) return;
+      if (state.hasAnswered || state.isFrozen) return;
+      
+      // Calculate answer time in milliseconds
+      const answerTime = Date.now() - questionStartTime;
+      state.answerTime = answerTime;
       
       // Stop the timer immediately
       if (questionTimer) {
@@ -376,18 +969,160 @@
       state.selectedAnswer = answerIndex;
       
       const isCorrect = answerIndex === state.currentQuestion.correct;
+      const myPlayer = state.currentGame.players.find(p => p.name === state.playerName);
       
-      if (isCorrect) {
-        showSuccess('Correct! ✅');
+      if (state.currentGame.isPowerupMode) {
+        // Powerup earning mode (unchanged)
+        if (isCorrect) {
+          const powerupTypes = ['freeze', 'shield', 'double', 'fireball', 'switch', 'star'];
+          const randomPowerup = powerupTypes[Math.floor(Math.random() * powerupTypes.length)];
+          myPlayer.powerups[randomPowerup]++;
+          
+          const powerupNames = { 
+            freeze: '❄️ Ice Freeze', 
+            shield: '🛡️ Shield', 
+            double: '✌️ Double Points',
+            fireball: '🔥 Fireball',
+            switch: '🔄 Switch',
+            star: '⭐ Battlestar'
+          };
+          showSuccess(`Correct! ✅ Earned ${powerupNames[randomPowerup]}!`);
+          
+          state.currentGame.powerupQuestionCount++;
+          
+          if (state.currentGame.powerupQuestionCount >= 3) {
+            state.currentGame.isPowerupMode = false;
+            state.currentGame.powerupQuestionCount = 0;
+            saveGameCloud(state.currentGame);
+            
+            setTimeout(() => {
+              state.view = 'lobby';
+              state.currentGame.status = 'lobby';
+              state.currentQuestion = null;
+              renderStatic();
+            }, 2000);
+          } else {
+            saveGameCloud(state.currentGame);
+            setTimeout(() => {
+              startQuestion();
+            }, 2000);
+          }
+        } else {
+          showError('Wrong! ❌ No powerup earned.');
+          
+          state.currentGame.powerupQuestionCount++;
+          
+          if (state.currentGame.powerupQuestionCount >= 3) {
+            state.currentGame.isPowerupMode = false;
+            state.currentGame.powerupQuestionCount = 0;
+            saveGameCloud(state.currentGame);
+            
+            setTimeout(() => {
+              state.view = 'lobby';
+              state.currentGame.status = 'lobby';
+              state.currentQuestion = null;
+              renderStatic();
+            }, 2000);
+          } else {
+            saveGameCloud(state.currentGame);
+            setTimeout(() => {
+              startQuestion();
+            }, 2000);
+          }
+        }
+      } else if (state.currentGame.isBracketRound) {
+        // Bracket round mode (unchanged)
+        if (isCorrect) {
+          state.currentGame.bracketScores[state.playerName]++;
+          showSuccess('Correct! ✅ Point scored!');
+        } else {
+          showError('Wrong! ❌ No point.');
+        }
+        
+        saveGameCloud(state.currentGame);
+        renderStatic();
+        
+        if (!state.currentGame.bracketQuestionCount) {
+          state.currentGame.bracketQuestionCount = 0;
+        }
+        state.currentGame.bracketQuestionCount++;
+        
+        if (state.currentGame.bracketQuestionCount >= 5) {
+          setTimeout(() => {
+            endBracketRound();
+          }, 2000);
+        } else {
+          saveGameCloud(state.currentGame);
+          setTimeout(() => {
+            startQuestion();
+          }, 2000);
+        }
+      } else if (state.currentGame.currentMatchup) {
+        // Tournament matchup mode - NEW!
+        if (!state.currentGame.matchupAnswers) {
+          state.currentGame.matchupAnswers = {};
+        }
+        
+        state.currentGame.matchupAnswers[state.playerName] = {
+          answerIndex,
+          isCorrect,
+          answerTime,
+          timeRemaining: state.timeLeft
+        };
+        
+        saveGameCloud(state.currentGame);
+        
+        if (isCorrect) {
+          showSuccess(`Correct! ✅ (${(answerTime / 1000).toFixed(2)}s)`);
+        } else {
+          showError(`Wrong! ❌ (${(answerTime / 1000).toFixed(2)}s)`);
+        }
+        
+        renderStatic();
+        
+        // Check if both players in matchup have answered
+        const matchup = state.currentGame.currentMatchup;
+        const answers = state.currentGame.matchupAnswers;
+        
+        if (answers[matchup.player1] && answers[matchup.player2]) {
+          setTimeout(() => {
+            checkMatchupResult();
+          }, 2000);
+        }
       } else {
-        showError('Wrong! ❌');
+        // Old single elimination mode - fallback
+        if (isCorrect) {
+          const pointsToAdd = myPlayer.doublePoints ? 2 : 1;
+          myPlayer.wins += pointsToAdd;
+          myPlayer.doublePoints = false;
+          
+          showSuccess(pointsToAdd === 2 ? 'Correct! ✅✅ Double Points!' : 'Correct! ✅');
+          saveGameCloud(state.currentGame);
+        } else {
+          if (myPlayer.hasShield) {
+            myPlayer.hasShield = false;
+            showSuccess('Wrong but Shield protected you! 🛡️');
+          } else {
+            myPlayer.losses++;
+            
+            if (myPlayer.losses >= 1) {
+              myPlayer.eliminated = true;
+              showError('Wrong! ❌ ELIMINATED!');
+            }
+          }
+          saveGameCloud(state.currentGame);
+        }
+        
+        renderStatic();
+        
+        setTimeout(() => {
+          if (checkForPodium()) {
+            showPodium();
+          } else {
+            showResults();
+          }
+        }, 2000);
       }
-      
-      render();
-      
-      setTimeout(() => {
-        showResults();
-      }, 2000);
     }
 
     async function showResults() {
@@ -398,9 +1133,9 @@
       }
       
       state.view = 'results';
-      render();
+      renderStatic();
       
-      setTimeout(async () => {
+      setTimeout(() => {
         // Reset question state
         state.currentQuestion = null;
         state.selectedAnswer = null;
@@ -412,8 +1147,8 @@
         state.currentGame.status = 'lobby';
         state.currentGame.currentQuestion = null;
         state.currentGame.timestamp = Date.now();
-        await saveGame(state.currentGame);
-        render();
+        saveGameCloud(state.currentGame);
+        renderStatic();
       }, 3000);
     }
 
@@ -423,7 +1158,7 @@
       crown: `<svg fill="currentColor" viewBox="0 0 20 20" style="width:100%;height:100%"><path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clip-rule="evenodd"/></svg>`
     };
 
-    function render() {
+    function renderStatic() {
       try {
         const app = document.getElementById('app');
         if (!app) return;
@@ -445,16 +1180,16 @@
               <p style="font-size:0.875rem;color:#9ca3af;margin-top:1rem">🌍 Play with ANYONE on ANY device!</p>
             </div>
             <div class="info-box text-center">
-              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">🚀 REAL ONLINE MULTIPLAYER</div>
-              <p style="font-size:0.75rem;color:#bfdbfe">Zero setup! Works across phones, tablets, and computers!</p>
+              <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.5rem;color:#60a5fa">🌍 REAL CROSS-DEVICE MULTIPLAYER</div>
+              <p style="font-size:0.75rem;color:#bfdbfe">Play together on phones, tablets, and computers!</p>
             </div>
             <div class="grid-2">
-              <button class="btn-purple card" onclick="state.view='create';render()" style="padding:2rem">
+              <button class="btn-purple card" onclick="state.view='create';renderStatic()" style="padding:2rem">
                 <div class="icon-md" style="color:#c084fc">${icons.crown}</div>
                 <div class="title" style="font-size:1.5rem;margin-bottom:0.5rem">HOST GAME</div>
                 <p style="font-size:0.875rem;color:#e9d5ff">Create tournament</p>
               </button>
-              <button class="btn-blue card" onclick="state.view='join';render()" style="padding:2rem">
+              <button class="btn-blue card" onclick="state.view='join';renderStatic()" style="padding:2rem">
                 <div class="icon-md" style="color:#60a5fa">${icons.users}</div>
                 <div class="title" style="font-size:1.5rem;margin-bottom:0.5rem">JOIN GAME</div>
                 <p style="font-size:0.875rem;color:#bfdbfe">Enter code</p>
@@ -465,7 +1200,7 @@
       } else if (state.view === 'create') {
         html += `
           <div class="container-sm slide-up" style="padding-top:4rem">
-            <button onclick="state.view='home';render()" class="mb-8" style="background:transparent;color:#c084fc;padding:0.5rem 1rem">← Back</button>
+            <button onclick="state.view='home';renderStatic()" class="mb-8" style="background:transparent;color:#c084fc;padding:0.5rem 1rem">← Back</button>
             <div class="card">
               <div class="icon-md mb-6" style="color:#c084fc">${icons.crown}</div>
               <h2 class="title text-center mb-8" style="font-size:1.875rem">CREATE TOURNAMENT</h2>
@@ -480,11 +1215,11 @@
               <div class="mb-6">
                 <label style="display:block;font-size:0.875rem;font-weight:600;margin-bottom:0.75rem;color:#d8b4fe">GAME MODE</label>
                 <div class="grid-2">
-                  <button type="button" onclick="state.gameMode='normal';render()" style="padding:1rem;background:${state.gameMode==='normal'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='normal'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
+                  <button type="button" onclick="state.gameMode='normal';renderStatic()" style="padding:1rem;background:${state.gameMode==='normal'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='normal'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
                     <div style="font-weight:700;margin-bottom:0.25rem">NORMAL</div>
                     <div style="font-size:0.75rem;color:#9ca3af">Classic trivia</div>
                   </button>
-                  <button type="button" onclick="state.gameMode='special';render()" style="padding:1rem;background:${state.gameMode==='special'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='special'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
+                  <button type="button" onclick="state.gameMode='special';renderStatic()" style="padding:1rem;background:${state.gameMode==='special'?'rgba(88,28,135,0.3)':'rgba(30,41,59,0.3)'};border:2px solid ${state.gameMode==='special'?'rgba(168,85,247,0.5)':'#334155'};border-radius:0.5rem">
                     <div style="font-weight:700;margin-bottom:0.25rem">SPECIAL</div>
                     <div style="font-size:0.75rem;color:#9ca3af">With powerups!</div>
                   </button>
@@ -497,7 +1232,7 @@
       } else if (state.view === 'join') {
         html += `
           <div class="container-sm slide-up" style="padding-top:4rem">
-            <button onclick="state.view='home';render()" class="mb-8" style="background:transparent;color:#c084fc;padding:0.5rem 1rem">← Back</button>
+            <button onclick="state.view='home';renderStatic()" class="mb-8" style="background:transparent;color:#c084fc;padding:0.5rem 1rem">← Back</button>
             <div class="card">
               <div class="icon-md mb-6" style="color:#60a5fa">${icons.users}</div>
               <h2 class="title text-center mb-8" style="font-size:1.875rem">JOIN TOURNAMENT</h2>
@@ -515,6 +1250,7 @@
         `;
       } else if (state.view === 'lobby' && state.currentGame) {
         const isHost = state.currentGame.host === state.playerName;
+        const myPlayer = state.currentGame.players.find(p => p.name === state.playerName);
         html += `
           <div class="container-lg slide-up" style="padding-top:2rem">
             <div class="text-center mb-12">
@@ -525,32 +1261,64 @@
               <h2 class="title" style="font-size:1.875rem;margin-bottom:0.5rem">WAITING FOR PLAYERS</h2>
               <p style="color:#d8b4fe">Theme: <span style="font-weight:600;color:white">${state.currentGame.theme}</span></p>
               <p style="font-size:0.875rem;color:#c084fc;margin-top:0.5rem">Mode: <span style="font-weight:600;color:white">${state.currentGame.mode==='special'?'⚡ SPECIAL (Powerups!)':'NORMAL'}</span></p>
-              ${state.currentGame.mode==='special'?`
-              <div class="mt-6" style="display:inline-block;background:rgba(124,45,18,0.3);padding:1rem;border-radius:0.5rem;border:2px solid rgba(168,85,247,0.5)">
-                <div style="font-size:0.75rem;color:#9ca3af;margin-bottom:0.5rem">AVAILABLE POWERUPS:</div>
-                <div style="font-size:1.5rem;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
-                  <span title="Ice Freeze" class="powerup-icon">❄️</span>
-                  <span title="Fireball" class="powerup-icon">🔥</span>
-                  <span title="Double Trouble" class="powerup-icon">✌️</span>
-                  <span title="Shield" class="powerup-icon">🛡️</span>
-                  <span title="Switch" class="powerup-icon">🔄</span>
-                  <span title="Battlestar" class="powerup-icon">⭐</span>
+              
+              ${myPlayer && state.currentGame.mode === 'special' ? `
+              <div class="mt-6" style="display:inline-block;background:rgba(88,28,135,0.3);padding:1rem 1.5rem;border-radius:0.75rem;border:2px solid rgba(168,85,247,0.5)">
+                <div style="font-size:0.75rem;color:#9ca3af;margin-bottom:0.5rem">YOUR POWERUPS:</div>
+                <div style="font-size:1.25rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+                  <div style="text-align:center">
+                    <div style="font-size:2rem">❄️</div>
+                    <div style="font-size:0.875rem;color:#60a5fa;font-weight:700">${myPlayer.powerups.freeze}</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:2rem">🛡️</div>
+                    <div style="font-size:0.875rem;color:#34d399;font-weight:700">${myPlayer.powerups.shield}</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:2rem">✌️</div>
+                    <div style="font-size:0.875rem;color:#fbbf24;font-weight:700">${myPlayer.powerups.double}</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:2rem">🔥</div>
+                    <div style="font-size:0.875rem;color:#ef4444;font-weight:700">${myPlayer.powerups.fireball}</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:2rem">🔄</div>
+                    <div style="font-size:0.875rem;color:#a78bfa;font-weight:700">${myPlayer.powerups.switch}</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:2rem">⭐</div>
+                    <div style="font-size:0.875rem;color:#fde047;font-weight:700">${myPlayer.powerups.star}</div>
+                  </div>
                 </div>
+                <button onclick="startPowerupMode()" class="btn-blue" style="margin-top:1rem;padding:0.75rem 1.5rem;font-size:0.875rem">
+                  📝 Answer Questions to Earn Powerups
+                </button>
               </div>
-              `:''}
+              ` : ''}
             </div>
             <div class="grid-3 mb-12">
-              ${state.currentGame.players.map(p => `
-                <div class="player-card">
+              ${state.currentGame.players.map(p => {
+                const isFrozen = p.frozenUntil && p.frozenUntil > Date.now();
+                return `
+                <div class="player-card ${isFrozen ? 'frozen' : ''} ${p.eliminated ? 'eliminated' : ''}" style="${p.eliminated ? 'opacity:0.5;border-color:#ef4444' : ''}">
+                  ${isFrozen ? '<div class="frozen-overlay">❄️</div>' : ''}
                   ${p.isHost?`<div class="icon-sm" style="color:#fbbf24;margin:0 auto 0.5rem">${icons.crown}</div>`:''}
                   <div style="font-weight:600;font-size:1.125rem">${p.name}</div>
+                  ${p.eliminated ? '<div style="font-size:0.75rem;color:#ef4444;margin-top:0.25rem">❌ ELIMINATED</div>' : ''}
+                  ${!p.eliminated ? `
+                    <div style="font-size:0.75rem;color:#9ca3af;margin-top:0.5rem">
+                      ✅ ${p.wins} wins • ❌ ${p.losses} losses
+                    </div>
+                  ` : ''}
                   ${p.isHost?'<div style="font-size:0.75rem;color:#c084fc;margin-top:0.25rem">HOST</div>':''}
                 </div>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
             ${isHost?`
             <div style="text-align:center">
-              <button onclick="startTournament()" ${state.currentGame.players.length<2?'disabled':''} class="btn-green title" style="font-size:1.5rem;padding:1rem 3rem">
+              <button onclick="startTournament()" ${state.currentGame.players.filter(p => !p.eliminated).length<2?'disabled':''} class="btn-green title" style="font-size:1.5rem;padding:1rem 3rem">
                 ⚡ START TOURNAMENT
               </button>
             </div>
@@ -558,18 +1326,66 @@
           </div>
         `;
       } else if (state.view === 'playing' && state.currentQuestion) {
+        const myPlayer = state.currentGame.players.find(p => p.name === state.playerName);
         html += `
           <div class="container slide-up" style="padding-top:2rem">
-            <div class="card" style="margin-bottom:2rem">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem">
-                <div style="font-size:0.875rem;color:#d8b4fe">
-                  <span style="font-weight:600">Theme:</span> ${state.currentGame.theme}
-                </div>
-                <div style="font-size:2rem;font-weight:900;color:${state.timeLeft <= 5 ? '#ef4444' : '#10b981'}">
-                  ${state.timeLeft}s
+            ${state.isFrozen ? `
+              <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;background:rgba(59,130,246,0.95);padding:2rem;border-radius:1rem;text-align:center">
+                <div style="font-size:4rem;margin-bottom:1rem">❄️</div>
+                <div class="title" style="font-size:2rem;margin-bottom:0.5rem">FROZEN!</div>
+                <div style="font-size:1.5rem;font-weight:900">${state.freezeTimeLeft}s</div>
+              </div>
+            ` : ''}
+            
+            ${state.currentGame.isBracketRound ? `
+              <div style="background:rgba(251,191,36,0.2);border:2px solid #fbbf24;border-radius:0.75rem;padding:1rem;margin-bottom:1.5rem;text-align:center">
+                <div style="font-size:1.5rem;font-weight:900;color:#fbbf24;margin-bottom:0.5rem">⭐ BRACKET ROUND ⭐</div>
+                <div style="font-size:0.875rem;color:#fde047">Everyone competes - Top half advances!</div>
+                <div style="font-size:0.75rem;color:#9ca3af;margin-top:0.5rem">Question ${state.currentGame.bracketQuestionCount || 0} of 5</div>
+                <div style="display:flex;gap:1rem;justify-content:center;margin-top:1rem;flex-wrap:wrap">
+                  ${Object.entries(state.currentGame.bracketScores || {}).sort((a, b) => b[1] - a[1]).map(([name, score]) => `
+                    <div style="background:rgba(0,0,0,0.3);padding:0.5rem 1rem;border-radius:0.5rem;${name === state.playerName ? 'border:2px solid #fbbf24' : ''}">
+                      <span style="font-weight:700">${name}:</span> ${score}
+                    </div>
+                  `).join('')}
                 </div>
               </div>
-              
+            ` : state.currentGame.currentMatchup ? `
+              <div style="background:rgba(168,85,247,0.2);border:2px solid rgba(168,85,247,0.5);border-radius:0.75rem;padding:1rem;margin-bottom:1.5rem;text-align:center">
+                <div style="font-size:1.25rem;font-weight:900;color:#c084fc;margin-bottom:0.5rem">🥊 HEAD-TO-HEAD MATCHUP</div>
+                <div style="font-size:1.5rem;font-weight:700">
+                  <span style="${state.currentGame.currentMatchup.player1 === state.playerName ? 'color:#fbbf24' : ''}">${state.currentGame.currentMatchup.player1}</span>
+                  <span style="color:#9ca3af;margin:0 1rem">VS</span>
+                  <span style="${state.currentGame.currentMatchup.player2 === state.playerName ? 'color:#fbbf24' : ''}">${state.currentGame.currentMatchup.player2}</span>
+                </div>
+                <div style="font-size:0.75rem;color:#d8b4fe;margin-top:0.5rem">Speed matters if both are correct!</div>
+                ${state.currentGame.matchupAnswers && Object.keys(state.currentGame.matchupAnswers).length > 0 ? `
+                  <div style="margin-top:1rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+                    ${state.currentGame.matchupAnswers[state.currentGame.currentMatchup.player1] ? `
+                      <div style="background:rgba(34,197,94,0.2);padding:0.5rem 1rem;border-radius:0.5rem;border:2px solid #22c55e">
+                        ${state.currentGame.currentMatchup.player1} answered
+                      </div>
+                    ` : ''}
+                    ${state.currentGame.matchupAnswers[state.currentGame.currentMatchup.player2] ? `
+                      <div style="background:rgba(34,197,94,0.2);padding:0.5rem 1rem;border-radius:0.5rem;border:2px solid #22c55e">
+                        ${state.currentGame.currentMatchup.player2} answered
+                      </div>
+                    ` : ''}
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+            
+            <div class="timer-circle">
+              <svg width="120" height="120">
+                <circle class="timer-bg" cx="60" cy="60" r="45"></circle>
+                <circle id="timer-progress" class="timer-progress" cx="60" cy="60" r="45" 
+                  style="stroke-dasharray: 283; stroke-dashoffset: 0"></circle>
+              </svg>
+              <div id="timer-text" class="timer-text">${state.timeLeft}</div>
+            </div>
+            
+            <div class="card" style="margin-bottom:2rem">
               <h2 class="title text-center mb-12" style="font-size:1.875rem;line-height:1.4">
                 ${state.currentQuestion.question}
               </h2>
@@ -595,7 +1411,7 @@
                   return `
                     <button 
                       onclick="answerQuestion(${i})" 
-                      ${state.hasAnswered ? 'disabled' : ''}
+                      ${state.hasAnswered || state.isFrozen ? 'disabled' : ''}
                       style="padding:1.5rem;background:${bgColor};border:2px solid ${borderColor};border-radius:0.75rem;font-size:1.125rem;font-weight:600;min-height:5rem;display:flex;align-items:center;justify-content:center;text-align:center"
                     >
                       ${option}
@@ -622,22 +1438,278 @@
             <p style="font-size:0.875rem;color:#9ca3af">Returning to lobby...</p>
           </div>
         `;
+      } else if (state.view === 'bracketResults' && state.currentGame && state.currentGame.bracketResults) {
+        const results = state.currentGame.bracketResults;
+        const advancingCount = state.currentGame.advancingCount;
+        
+        html += `
+          <div class="container text-center slide-up" style="padding-top:2rem">
+            <h1 class="title glow" style="font-size:3.5rem;margin-bottom:1rem">⭐ BRACKET ROUND RESULTS ⭐</h1>
+            <p style="font-size:1.25rem;color:#d8b4fe;margin-bottom:3rem">Top ${advancingCount} advance!</p>
+            
+            <div style="max-width:600px;margin:0 auto">
+              ${results.map((player, index) => {
+                const isAdvancing = index < advancingCount;
+                return `
+                  <div style="background:${isAdvancing ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'};border:2px solid ${isAdvancing ? '#22c55e' : '#ef4444'};border-radius:0.75rem;padding:1.5rem;margin-bottom:1rem;animation:slideUp 0.5s ease-out ${index * 0.1}s both">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <span style="font-size:1.5rem;font-weight:900;margin-right:1rem">#${index + 1}</span>
+                        <span style="font-size:1.25rem;font-weight:700">${player.name}</span>
+                      </div>
+                      <div style="text-align:right">
+                        <div style="font-size:2rem;font-weight:900;color:${isAdvancing ? '#22c55e' : '#ef4444'}">${player.score}</div>
+                        <div style="font-size:0.875rem;color:${isAdvancing ? '#22c55e' : '#ef4444'};font-weight:700">
+                          ${isAdvancing ? '✅ ADVANCES' : '❌ ELIMINATED'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            
+            <p style="font-size:0.875rem;color:#9ca3af;margin-top:3rem">
+              ${checkForPodium() ? 'Showing final results...' : 'Returning to lobby...'}
+            </p>
+          </div>
+        `;
+      } else if (state.view === 'matchupResult' && state.currentGame && state.currentGame.matchupResult) {
+        const result = state.currentGame.matchupResult;
+        
+        if (result.bothWrong) {
+          // Both wrong - show tie message
+          html += `
+            <div class="container text-center slide-up" style="padding-top:4rem">
+              <h1 class="title glow" style="font-size:3rem;margin-bottom:2rem">MATCHUP RESULT</h1>
+              
+              <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:3rem;flex-wrap:wrap">
+                <div style="flex:1;max-width:300px;background:rgba(239,68,68,0.2);border:3px solid #ef4444;border-radius:1rem;padding:2rem">
+                  <div style="font-size:3rem;margin-bottom:1rem">❌</div>
+                  <div class="title" style="font-size:1.5rem;margin-bottom:1rem">${result.p1.name}</div>
+                  <div style="font-size:1.125rem;margin-bottom:0.5rem">❌ Wrong</div>
+                  <div style="font-size:0.875rem;color:#9ca3af">Time: ${(result.p1.answerTime / 1000).toFixed(2)}s</div>
+                </div>
+                
+                <div style="font-size:4rem;align-self:center;color:#9ca3af">VS</div>
+                
+                <div style="flex:1;max-width:300px;background:rgba(239,68,68,0.2);border:3px solid #ef4444;border-radius:1rem;padding:2rem">
+                  <div style="font-size:3rem;margin-bottom:1rem">❌</div>
+                  <div class="title" style="font-size:1.5rem;margin-bottom:1rem">${result.p2.name}</div>
+                  <div style="font-size:1.125rem;margin-bottom:0.5rem">❌ Wrong</div>
+                  <div style="font-size:0.875rem;color:#9ca3af">Time: ${(result.p2.answerTime / 1000).toFixed(2)}s</div>
+                </div>
+              </div>
+              
+              <div style="background:rgba(251,191,36,0.2);border:2px solid #fbbf24;border-radius:0.75rem;padding:1.5rem;max-width:500px;margin:0 auto">
+                <div style="font-size:1.5rem;font-weight:700;color:#fbbf24;margin-bottom:0.5rem">⚔️ BOTH WRONG!</div>
+                <div style="font-size:1rem;color:#fde047">Playing another question...</div>
+              </div>
+            </div>
+          `;
+        } else {
+          // Normal result with winner/loser
+          html += `
+            <div class="container text-center slide-up" style="padding-top:4rem">
+              <h1 class="title glow" style="font-size:3rem;margin-bottom:2rem">MATCHUP RESULT</h1>
+              
+              <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:3rem;flex-wrap:wrap">
+                <div style="flex:1;max-width:300px;background:${result.winner === result.p1.name ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'};border:3px solid ${result.winner === result.p1.name ? '#22c55e' : '#ef4444'};border-radius:1rem;padding:2rem">
+                  <div style="font-size:3rem;margin-bottom:1rem">${result.winner === result.p1.name ? '🏆' : '💀'}</div>
+                  <div class="title" style="font-size:1.5rem;margin-bottom:1rem">${result.p1.name}</div>
+                  <div style="font-size:1.125rem;margin-bottom:0.5rem">${result.p1.isCorrect ? '✅ Correct' : '❌ Wrong'}</div>
+                  <div style="font-size:0.875rem;color:#9ca3af">Time: ${(result.p1.answerTime / 1000).toFixed(2)}s</div>
+                  ${result.winner === result.p1.name ? '<div style="font-size:1rem;color:#22c55e;margin-top:1rem;font-weight:700">WINNER!</div>' : '<div style="font-size:1rem;color:#ef4444;margin-top:1rem;font-weight:700">ELIMINATED</div>'}
+                </div>
+                
+                <div style="font-size:4rem;align-self:center;color:#9ca3af">VS</div>
+                
+                <div style="flex:1;max-width:300px;background:${result.winner === result.p2.name ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'};border:3px solid ${result.winner === result.p2.name ? '#22c55e' : '#ef4444'};border-radius:1rem;padding:2rem">
+                  <div style="font-size:3rem;margin-bottom:1rem">${result.winner === result.p2.name ? '🏆' : '💀'}</div>
+                  <div class="title" style="font-size:1.5rem;margin-bottom:1rem">${result.p2.name}</div>
+                  <div style="font-size:1.125rem;margin-bottom:0.5rem">${result.p2.isCorrect ? '✅ Correct' : '❌ Wrong'}</div>
+                  <div style="font-size:0.875rem;color:#9ca3af">Time: ${(result.p2.answerTime / 1000).toFixed(2)}s</div>
+                  ${result.winner === result.p2.name ? '<div style="font-size:1rem;color:#22c55e;margin-top:1rem;font-weight:700">WINNER!</div>' : '<div style="font-size:1rem;color:#ef4444;margin-top:1rem;font-weight:700">ELIMINATED</div>'}
+                </div>
+              </div>
+              
+              ${result.p1.isCorrect && result.p2.isCorrect ? `
+                <div style="background:rgba(251,191,36,0.2);border:2px solid #fbbf24;border-radius:0.75rem;padding:1rem;max-width:500px;margin:0 auto">
+                  <div style="font-size:1.25rem;font-weight:700;color:#fbbf24;margin-bottom:0.5rem">⚡ BOTH CORRECT!</div>
+                  <div style="font-size:0.875rem;color:#fde047">Winner determined by speed</div>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }
+      } else if (state.view === 'podium' && state.currentGame && state.currentGame.rankedPlayers) {
+        const ranked = state.currentGame.rankedPlayers;
+        const podiumHeights = ['250px', '350px', '200px']; // 2nd, 1st, 3rd
+        const podiumColors = ['#c0c0c0', '#ffd700', '#cd7f32']; // Silver, Gold, Bronze
+        const podiumLabels = ['🥈 2ND', '🥇 1ST', '🥉 3RD'];
+        
+        html += `
+          <div class="container text-center slide-up" style="padding-top:2rem">
+            <h1 class="title glow" style="font-size:4rem;margin-bottom:3rem">🏆 CHAMPIONS! 🏆</h1>
+            
+            <div style="display:flex;justify-content:center;align-items:flex-end;gap:2rem;margin-bottom:3rem;flex-wrap:wrap">
+              ${ranked[1] ? `
+              <div style="animation: slideUp 1s ease-out 0.3s both">
+                <div style="background:linear-gradient(to bottom, ${podiumColors[0]}, ${podiumColors[0]}dd);border:3px solid ${podiumColors[0]};border-radius:1rem 1rem 0 0;padding:2rem 1.5rem;min-width:200px">
+                  <div style="font-size:3rem;margin-bottom:0.5rem">🥈</div>
+                  <div class="title" style="font-size:1.5rem;margin-bottom:0.5rem">${ranked[1].name}</div>
+                  <div style="font-size:2rem;font-weight:900;color:#ffd700">${ranked[1].wins} 🏆</div>
+                </div>
+                <div style="background:${podiumColors[0]};height:${podiumHeights[0]};display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:white">
+                  2ND
+                </div>
+              </div>
+              ` : ''}
+              
+              ${ranked[0] ? `
+              <div style="animation: slideUp 1s ease-out 0.1s both">
+                <div style="background:linear-gradient(to bottom, ${podiumColors[1]}, ${podiumColors[1]}dd);border:3px solid ${podiumColors[1]};border-radius:1rem 1rem 0 0;padding:2rem 1.5rem;min-width:200px;box-shadow:0 0 40px ${podiumColors[1]}aa">
+                  <div style="font-size:4rem;margin-bottom:0.5rem">👑</div>
+                  <div class="title" style="font-size:2rem;margin-bottom:0.5rem">${ranked[0].name}</div>
+                  <div style="font-size:2.5rem;font-weight:900;color:#fff">${ranked[0].wins} 🏆</div>
+                </div>
+                <div style="background:${podiumColors[1]};height:${podiumHeights[1]};display:flex;align-items:center;justify-content:center;font-size:2.5rem;font-weight:900;color:white;box-shadow:0 0 40px ${podiumColors[1]}88">
+                  1ST
+                </div>
+              </div>
+              ` : ''}
+              
+              ${ranked[2] ? `
+              <div style="animation: slideUp 1s ease-out 0.5s both">
+                <div style="background:linear-gradient(to bottom, ${podiumColors[2]}, ${podiumColors[2]}dd);border:3px solid ${podiumColors[2]};border-radius:1rem 1rem 0 0;padding:2rem 1.5rem;min-width:200px">
+                  <div style="font-size:3rem;margin-bottom:0.5rem">🥉</div>
+                  <div class="title" style="font-size:1.5rem;margin-bottom:0.5rem">${ranked[2].name}</div>
+                  <div style="font-size:2rem;font-weight:900;color:#ffd700">${ranked[2].wins} 🏆</div>
+                </div>
+                <div style="background:${podiumColors[2]};height:${podiumHeights[2]};display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:white">
+                  3RD
+                </div>
+              </div>
+              ` : ''}
+            </div>
+            
+            ${ranked.length > 3 ? `
+            <div style="margin-top:3rem">
+              <h3 class="title" style="font-size:1.5rem;margin-bottom:1rem">Other Players:</h3>
+              <div style="display:flex;flex-direction:column;gap:0.5rem;max-width:400px;margin:0 auto">
+                ${ranked.slice(3).map((p, i) => `
+                  <div style="background:rgba(15,23,42,0.5);border:2px solid rgba(168,85,247,0.5);border-radius:0.5rem;padding:1rem;display:flex;justify-content:space-between">
+                    <span style="font-weight:600">${i + 4}. ${p.name}</span>
+                    <span style="color:#fbbf24">${p.wins} 🏆</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            ` : ''}
+            
+            <button onclick="location.reload()" class="btn-purple title" style="margin-top:3rem;padding:1rem 2rem;font-size:1.25rem">
+              🎮 Play Again
+            </button>
+          </div>
+        `;
       }
 
       html += `
         <div class="status-indicator" onclick="this.style.display='none'" title="Click to dismiss">
-          <div style="color:#4ade80">✅ Online & Ready!</div>
+          <div style="color:#4ade80">✅ Online & Connected!</div>
           <div style="color:#9ca3af">Cross-device enabled • Click to hide</div>
         </div>
       `;
+      
+      // Add persistent powerup button (only in special mode and when player has game)
+      if (state.currentGame && state.currentGame.mode === 'special' && state.playerName && 
+          (state.view === 'lobby' || state.view === 'playing' || state.view === 'results' || state.view === 'matchupResult')) {
+        const myPlayer = state.currentGame.players.find(p => p.name === state.playerName);
+        const totalPowerups = myPlayer ? Object.values(myPlayer.powerups).reduce((sum, count) => sum + count, 0) : 0;
+        
+        html += `
+          <button 
+            onclick="togglePowerupMenu()" 
+            ${totalPowerups === 0 || state.isFrozen ? 'disabled' : ''}
+            style="position:fixed;bottom:1rem;left:1rem;background:linear-gradient(to right, #9333ea, #6b21a8);border:2px solid rgba(168,85,247,0.5);color:white;padding:1rem 1.5rem;border-radius:999px;font-weight:700;font-size:1rem;cursor:pointer;z-index:60;box-shadow:0 10px 40px rgba(168,85,247,0.4);transition:all 0.3s;${totalPowerups === 0 ? 'opacity:0.5;' : ''}"
+            onmouseover="if(!this.disabled) this.style.transform='scale(1.1)'"
+            onmouseout="this.style.transform='scale(1)'"
+          >
+            ⚡ Use Powerups (${totalPowerups})
+          </button>
+        `;
+      }
+      
+      // Add powerup menu overlay
+      if (state.showPowerupMenu && state.currentGame && state.playerName) {
+        const myPlayer = state.currentGame.players.find(p => p.name === state.playerName);
+        if (myPlayer) {
+          const powerupData = [
+            { key: 'freeze', icon: '❄️', name: 'Ice Freeze', desc: 'Freeze all opponents for 3 seconds', color: '#60a5fa' },
+            { key: 'shield', icon: '🛡️', name: 'Shield', desc: 'Protect from next elimination', color: '#34d399' },
+            { key: 'double', icon: '✌️', name: 'Double Points', desc: 'Next win counts twice', color: '#fbbf24' },
+            { key: 'fireball', icon: '🔥', name: 'Fireball', desc: 'Destroy opponent\'s powerup', color: '#ef4444' },
+            { key: 'switch', icon: '🔄', name: 'Switch', desc: 'Swap scores with opponent', color: '#a78bfa' },
+            { key: 'star', icon: '⭐', name: 'Battlestar', desc: 'Bracket round - Top half advances', color: '#fde047' }
+          ];
+          
+          html += `
+            <div class="overlay" style="z-index:200" onclick="togglePowerupMenu()">
+              <div onclick="event.stopPropagation()" style="background:rgba(15,23,42,0.95);border:2px solid rgba(168,85,247,0.5);border-radius:1rem;padding:2rem;max-width:600px;width:90%;max-height:80vh;overflow-y:auto">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem">
+                  <h2 class="title" style="font-size:2rem">⚡ Use Powerups</h2>
+                  <button onclick="togglePowerupMenu()" style="background:transparent;border:none;color:#9ca3af;font-size:2rem;cursor:pointer;padding:0.5rem">×</button>
+                </div>
+                
+                <div style="display:grid;gap:1rem">
+                  ${powerupData.map(p => {
+                    const count = myPlayer.powerups[p.key] || 0;
+                    const canUse = count > 0 && !state.isFrozen;
+                    
+                    return `
+                      <button 
+                        onclick="${canUse ? `usePowerup('${p.key}'); togglePowerupMenu()` : ''}" 
+                        ${!canUse ? 'disabled' : ''}
+                        style="background:${canUse ? 'rgba(88,28,135,0.3)' : 'rgba(30,41,59,0.3)'};border:2px solid ${canUse ? 'rgba(168,85,247,0.5)' : '#334155'};border-radius:0.75rem;padding:1.5rem;text-align:left;cursor:${canUse ? 'pointer' : 'not-allowed'};transition:all 0.3s;opacity:${canUse ? '1' : '0.5'}"
+                        ${canUse ? `onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 10px 40px rgba(168,85,247,0.4)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'"` : ''}
+                      >
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                          <div style="display:flex;align-items:center;gap:1rem">
+                            <span style="font-size:2.5rem">${p.icon}</span>
+                            <div>
+                              <div style="font-size:1.25rem;font-weight:700;color:${p.color}">${p.name}</div>
+                              <div style="font-size:0.875rem;color:#9ca3af;margin-top:0.25rem">${p.desc}</div>
+                            </div>
+                          </div>
+                          <div style="background:rgba(0,0,0,0.3);border-radius:999px;padding:0.5rem 1rem;font-size:1.5rem;font-weight:900;color:${p.color}">
+                            ${count}
+                          </div>
+                        </div>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+                
+                ${myPlayer.hasShield ? '<div style="background:rgba(34,197,94,0.2);border:2px solid #22c55e;border-radius:0.5rem;padding:1rem;margin-top:1.5rem;text-align:center"><div style="font-size:1rem;color:#22c55e;font-weight:700">🛡️ Shield Active - Protected from elimination!</div></div>' : ''}
+                ${myPlayer.doublePoints ? '<div style="background:rgba(251,191,36,0.2);border:2px solid #fbbf24;border-radius:0.5rem;padding:1rem;margin-top:1.5rem;text-align:center"><div style="font-size:1rem;color:#fbbf24;font-weight:700">✌️ Double Points Active - Next win counts twice!</div></div>' : ''}
+              </div>
+            </div>
+          `;
+        }
+      }
 
       app.innerHTML = html;
+      
+      // Update timer display if on playing view
+      if (state.view === 'playing' && state.currentQuestion) {
+        updateTimerDisplay();
+      }
       } catch (error) {
-        console.error('Render error:', error);
+        // Silently handle render errors
       }
     }
 
-    render();
+    renderStatic();
   </script>
 </body>
 </html>
